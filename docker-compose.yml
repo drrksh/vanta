@@ -1,0 +1,45 @@
+version: "3.9"
+
+services:
+  backend:
+    build:
+      context: ./backend
+    ports:
+      - "8811:8811"
+    environment:
+      MOCK_LLM: ${MOCK_LLM:-true}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-1.5-flash}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-llama-3.1-8b-instant}
+      DATABASE_URL: sqlite+aiosqlite:///./data/vanta.db
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-change-me}
+      SCENARIOS_DIR: /scenarios
+    volumes:
+      - ./scenarios:/scenarios:ro
+      - backend-data:/app/data
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8811/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  discord_bot:
+    build:
+      context: ./discord_bot
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN}
+      VANTA_BACKEND_URL: http://backend:8811
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-change-me}
+      VANTA_BOT_STATE_PATH: /app/data/bot_state.json
+    volumes:
+      - bot-data:/app/data
+
+volumes:
+  backend-data:
+  bot-data:
