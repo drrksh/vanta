@@ -1,0 +1,252 @@
+id: vanishing_website
+title: "The Vanishing Website"
+domain: networking
+seed: 20260906
+briefing: >
+  The university website is intermittently unavailable. Some users can
+  access it fine; others get a "can't reach this site" error. The
+  infrastructure team confirms the servers themselves are healthy and
+  responding to health checks. Determine what is happening.
+
+difficulty:
+  technical_depth: 0.45
+  information_sparsity: 0.45
+  contradiction: 0.25
+  false_leads: 2
+  agent_count: 4
+  evidence_noise: 0.1
+  event_complexity: 0.3
+  experiment_cost: 0.15
+  solution_complexity: 0.5
+  adversarial_pressure: 0.1
+  dynamicity: 0.15
+
+ground_truth:
+  root_cause_id: dns_ttl_inconsistent_propagation
+  root_cause_summary: >
+    The university migrated to a new web server IP address two days ago.
+    The DNS record's TTL was left at its old, very long value (24 hours)
+    instead of being lowered ahead of the cutover. Resolvers and ISPs that
+    cached the old A record before the change are still serving the old
+    (now-decommissioned) IP to some users, while resolvers that refreshed
+    after the change correctly serve the new IP. This produces a
+    split-brain experience purely based on each user's DNS cache state, not
+    their location or device.
+  mechanism: >
+    Failure to lower DNS TTL ahead of a planned IP cutover ("DNS migration
+    without pre-lowering TTL"), combined with the old IP being fully
+    decommissioned rather than kept alive during the propagation window.
+  hidden_state:
+    old_ip: "203.0.113.44"
+    new_ip: "203.0.113.91"
+    old_ttl_seconds: 86400
+    cutover_time: "2 days ago, 09:00"
+    old_ip_decommissioned: true
+
+facts:
+  - id: fact_public_symptom
+    text: "The website is unreachable for some users and fine for others, seemingly at random."
+    classification: green
+    tags: [symptom]
+
+  - id: fact_public_servers_healthy
+    text: "The infrastructure team confirms server health checks are all green."
+    classification: green
+    tags: [symptom]
+
+  - id: fact_public_no_location_pattern
+    text: "It doesn't seem to be about which building or wifi network people are on -- affected and unaffected users are mixed together."
+    classification: green
+    tags: [symptom]
+
+  - id: fact_student_error_message
+    text: "When it fails, the browser shows something like 'This site can't be reached' or a connection timeout -- not a 404 or server error page."
+    classification: yellow
+    tags: [symptom]
+
+  - id: fact_student_works_on_phone_data
+    text: "A few students noticed the site loads fine on their phone's mobile data but fails on the campus wifi, or vice versa, depending on the day."
+    classification: yellow
+    tags: [symptom, contradiction]
+
+  - id: fact_admin_recent_change
+    text: "We did move the website to new server infrastructure about two days ago as part of a planned upgrade."
+    classification: yellow
+    tags: [change]
+
+  - id: fact_admin_old_servers_off
+    text: "The old servers were decommissioned and powered off shortly after the migration, since we didn't expect to need them."
+    classification: yellow
+    tags: [change, root_cause_adjacent]
+
+  - id: fact_network_engineer_healthchecks_pass
+    text: "All health checks against the new servers pass consistently -- uptime monitoring shows no server-side outage."
+    classification: yellow
+    tags: [false_lead_elimination]
+
+  - id: fact_network_engineer_no_firewall_changes
+    text: "We checked the firewall rules and load balancer config -- nothing changed there recently."
+    classification: yellow
+    tags: [false_lead]
+
+  - id: fact_network_engineer_dns_record_updated
+    text: "The DNS A record was updated to point to the new server IP at the time of the migration."
+    classification: yellow
+    tags: [architecture, root_cause_adjacent]
+
+  - id: fact_network_engineer_ttl_value
+    text: "Looking at the DNS zone file, the TTL on that record is set to 24 hours -- that's actually the value it's always had, we didn't change it before the cutover."
+    classification: yellow
+    tags: [root_cause]
+
+  - id: fact_security_engineer_no_dns_hijack
+    text: "We checked -- this isn't a DNS hijacking or spoofing attack. The authoritative DNS records themselves are correct and haven't been tampered with."
+    classification: yellow
+    tags: [false_lead_elimination]
+
+  - id: fact_security_engineer_old_ip_dead
+    text: "The old server IP address is completely dark now -- nothing is listening on it since it was decommissioned, so any request that lands there will simply time out."
+    classification: yellow
+    tags: [root_cause]
+
+  - id: fact_false_lead_isp_outage
+    text: "We initially wondered about a regional ISP outage, but the affected users span multiple different ISPs and networks, so that doesn't fit."
+    classification: yellow
+    tags: [false_lead]
+
+  - id: fact_false_lead_ddos
+    text: "Traffic volume looks completely normal, so this isn't a DDoS attack or unusual load."
+    classification: yellow
+    tags: [false_lead]
+
+  - id: fact_red_exact_cutover_data
+    text: "Cutover occurred at 09:00 two days ago; TTL was 86400 seconds and was not lowered in advance; old IP 203.0.113.44 was decommissioned same-day."
+    classification: red
+    tags: [ground_truth]
+
+  - id: fact_red_root_cause_statement
+    text: "Root cause: DNS TTL was not lowered ahead of the IP cutover, so resolvers with a cached old record continue serving a now-dead IP until their TTL naturally expires, up to 24 hours later."
+    classification: red
+    tags: [ground_truth]
+
+timeline:
+  - id: evt_migration_planned
+    at_seconds: -259200
+    description: "3 days ago - Infrastructure team plans server migration for the following day."
+    classification: green
+
+  - id: evt_dns_updated
+    at_seconds: -172800
+    description: "2 days ago, 09:00 - DNS A record updated to point to new server IP. TTL left unchanged at 24 hours."
+    classification: yellow
+    hidden_until_discovered: true
+
+  - id: evt_old_servers_off
+    at_seconds: -172740
+    description: "2 days ago, 09:01 - Old servers powered off."
+    classification: yellow
+    hidden_until_discovered: true
+
+  - id: evt_first_reports
+    at_seconds: -172200
+    description: "2 days ago, 09:10 - First user reports of the site being unreachable begin trickling in."
+    classification: green
+
+agents:
+  - id: student
+    role: "Affected Student"
+    display_name: "Marcus (Student)"
+    personality: >
+      Not technical, just frustrated that the site sometimes doesn't load.
+      Describes symptoms in plain language, mentions what device/network he
+      was using if asked, but doesn't understand DNS or infrastructure.
+    provider: gemini
+    knowledge_ids:
+      - fact_student_error_message
+      - fact_student_works_on_phone_data
+    conditional_knowledge_ids: {}
+
+  - id: administrator
+    role: "IT Administrator"
+    display_name: "Ms. Chen (IT Administrator)"
+    personality: >
+      Organized, a little worried this reflects poorly on a migration she
+      approved. Knows about the migration timeline and decisions but not
+      deep network protocol details.
+    provider: groq
+    knowledge_ids:
+      - fact_admin_recent_change
+      - fact_admin_old_servers_off
+    conditional_knowledge_ids: {}
+
+  - id: network_engineer
+    role: "Network Engineer"
+    display_name: "Alex (Network Engineer)"
+    personality: >
+      Technical, methodical, enjoys walking through diagnostics step by
+      step. Will explain DNS details clearly once asked about DNS
+      specifically, but won't volunteer it unprompted if asked only vague
+      questions.
+    provider: gemini
+    knowledge_ids:
+      - fact_network_engineer_healthchecks_pass
+      - fact_network_engineer_no_firewall_changes
+      - fact_network_engineer_dns_record_updated
+    conditional_knowledge_ids:
+      fact_network_engineer_ttl_value:
+        - fact_network_engineer_dns_record_updated
+
+  - id: security_engineer
+    role: "Security Engineer"
+    display_name: "Jordan (Security Engineer)"
+    personality: >
+      Careful and a little skeptical by default, wants to rule out malice
+      before agreeing it's "just" a config issue. Speaks in terms of threat
+      likelihood and evidence.
+    provider: groq
+    knowledge_ids:
+      - fact_security_engineer_no_dns_hijack
+      - fact_false_lead_isp_outage
+      - fact_false_lead_ddos
+    conditional_knowledge_ids:
+      fact_security_engineer_old_ip_dead:
+        - fact_admin_old_servers_off
+
+evaluation:
+  invariants:
+    - dns_propagation_safe_cutover
+  known_mechanisms:
+    - lower_ttl_before_cutover
+    - keep_old_ip_alive_during_propagation
+    - dns_based_gradual_cutover
+    - anycast_or_load_balancer_ip_reuse
+    - monitor_both_ips_during_migration
+  tests:
+    - id: identifies_correct_root_cause
+      description: "Solution correctly identifies DNS TTL/propagation as the root cause"
+      check: identifies_root_cause
+      params:
+        accepted_root_cause_ids: [dns_ttl_inconsistent_propagation]
+      required: true
+    - id: proposes_valid_migration_fix
+      description: "Solution proposes a mechanism that would actually prevent this class of failure on a future migration"
+      check: requires_any_mechanism
+      params:
+        any_of:
+          - lower_ttl_before_cutover
+          - keep_old_ip_alive_during_propagation
+          - dns_based_gradual_cutover
+          - anycast_or_load_balancer_ip_reuse
+      required: true
+    - id: not_purely_a_restart_fix
+      description: "Solution isn't just 'restart the servers', which does not address propagation"
+      check: forbids_mechanism
+      params:
+        none_of: []
+      required: false
+
+solution_schema:
+  - root_cause
+  - explanation
+  - proposed_solution
+  - implementation

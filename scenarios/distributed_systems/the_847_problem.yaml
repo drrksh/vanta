@@ -1,0 +1,278 @@
+id: the_847_problem
+title: "The 8:47 Problem"
+domain: distributed_systems
+seed: 847291
+briefing: >
+  Students are occasionally being sent to the wrong examination room.
+  Two different systems -- the Registrar's exam scheduling portal and the
+  Room Assignment Display boards outside each hall -- sometimes disagree
+  about which room a student should be in. It happens intermittently, and
+  nobody can reproduce it on demand. Determine what is happening and propose
+  a fix.
+
+difficulty:
+  technical_depth: 0.6
+  information_sparsity: 0.5
+  contradiction: 0.3
+  false_leads: 2
+  agent_count: 4
+  evidence_noise: 0.15
+  event_complexity: 0.4
+  experiment_cost: 0.2
+  solution_complexity: 0.6
+  adversarial_pressure: 0.1
+  dynamicity: 0.2
+
+ground_truth:
+  root_cause_id: stale_read_replica_divergence
+  root_cause_summary: >
+    The Room Assignment Display boards read from a read replica database
+    that lags behind the primary. When the Registrar updates an assignment,
+    the write goes to the primary immediately, but the display boards (and
+    the mobile app) query the replica, which can be several seconds to a
+    couple of minutes behind during peak load. Students who check right
+    after a last-minute room change see the stale (old) room.
+  mechanism: >
+    Asynchronous primary-to-replica replication with no read-your-writes or
+    monotonic-read guarantee on the client-facing read path; replication lag
+    spikes during the 08:40-08:50 registration-confirmation window because
+    that is when the batch reassignment job runs and floods the replication
+    log.
+  hidden_state:
+    replication_lag_seconds_baseline: 2
+    replication_lag_seconds_peak: 95
+    batch_job_name: "exam_room_reassignment_batch"
+    batch_job_runs_at: "08:40"
+
+facts:
+  # ---- GREEN: public knowledge, visible to contestant and every agent ----
+  - id: fact_public_symptom
+    text: "Some students have arrived at the wrong exam room this week, mostly right around 8:45-8:50am."
+    classification: green
+    tags: [symptom]
+
+  - id: fact_public_two_systems
+    text: "There are two places students can check their room: the Registrar web portal and the physical display boards outside each hall."
+    classification: green
+    tags: [architecture]
+
+  - id: fact_public_intermittent
+    text: "The problem does not happen every day, and support cannot reproduce it on demand."
+    classification: green
+    tags: [symptom]
+
+  # ---- YELLOW: agent-specific, must be explicitly granted ----
+  - id: fact_student_mobile_app
+    text: "Some students say the mobile app matched the display board (both wrong), while others who checked the website directly saw the correct new room."
+    classification: yellow
+    tags: [symptom, contradiction]
+
+  - id: fact_student_checked_early
+    text: "The students who got it wrong all checked their room within a minute or two of an announced late room change."
+    classification: yellow
+    tags: [symptom, timing]
+
+  - id: fact_officer_manual_reassignment
+    text: "The Examination Office does sometimes reassign a room at the last minute, for example if a hall becomes unavailable."
+    classification: yellow
+    tags: [process]
+
+  - id: fact_officer_no_pattern_by_room
+    text: "We don't see a pattern by which room or building is affected -- it seems to follow the timing of the change, not the location."
+    classification: yellow
+    tags: [process, timing]
+
+  - id: fact_developer_write_path
+    text: "When the Registrar updates a room assignment, the write is confirmed to the primary database instantly -- the write path itself is not the problem."
+    classification: yellow
+    tags: [architecture]
+
+  - id: fact_developer_display_board_source
+    text: "The display boards and the mobile app both pull room data from a read replica database, refreshed on a short interval, to avoid putting load on the primary during peak morning traffic."
+    classification: yellow
+    tags: [architecture, root_cause_adjacent]
+
+  - id: fact_developer_no_cache_bug
+    text: "We already checked -- there's no caching layer or CDN involved in the room lookup path, so it's not a caching bug in the traditional sense."
+    classification: yellow
+    tags: [false_lead_elimination]
+
+  - id: fact_infra_replication_lag_exists
+    text: "Our replica lag graphs show it's usually under 2-3 seconds, but there are periodic spikes we haven't fully explained."
+    classification: yellow
+    tags: [infrastructure, root_cause_adjacent]
+
+  - id: fact_infra_batch_job
+    text: "There's a batch job that runs around 8:40am to reconcile any overnight exam room reassignments before the day starts."
+    classification: yellow
+    tags: [infrastructure, timing, root_cause_adjacent]
+
+  - id: fact_infra_batch_job_load
+    text: "That batch job writes a large number of rows in a short window, and we have seen replication lag spike specifically during and right after it runs."
+    classification: yellow
+    tags: [infrastructure, root_cause]
+
+  - id: fact_infra_no_read_consistency_guarantee
+    text: "The read replica is eventually consistent -- there's no guarantee that a read immediately after a write on the primary will reflect that write."
+    classification: yellow
+    tags: [infrastructure, root_cause]
+
+  # False leads (explicitly present so agents can mention and then rule out)
+  - id: fact_false_lead_network
+    text: "We looked at campus wifi outages as a possible cause, but the timing doesn't correlate with any known network incidents."
+    classification: yellow
+    tags: [false_lead]
+
+  - id: fact_false_lead_permissions
+    text: "We also checked whether some staff had incorrect permissions and were editing the wrong room field, but the audit log shows all edits were correct and intentional."
+    classification: yellow
+    tags: [false_lead]
+
+  # ---- RED: ground truth internals, never given to any agent ----
+  - id: fact_red_exact_lag_measurement
+    text: "Internal metrics show p99 replication lag hit 95 seconds during the 08:40 batch job on the days incidents were reported, versus a 2-second baseline."
+    classification: red
+    tags: [ground_truth]
+
+  - id: fact_red_root_cause_statement
+    text: "Root cause: asynchronous read-replica replication lag caused by the 08:40 batch reassignment job, combined with no read-your-writes guarantee on the student-facing read path."
+    classification: red
+    tags: [ground_truth]
+
+timeline:
+  - id: evt_batch_job
+    at_seconds: 0
+    description: "08:40 - Exam room reassignment batch job runs, writing many rows to the primary database."
+    classification: yellow
+    hidden_until_discovered: true
+
+  - id: evt_replication_lag_spike
+    at_seconds: 60
+    description: "08:41 - Replication lag to the read replica spikes as it catches up with the batch write volume."
+    classification: yellow
+    hidden_until_discovered: true
+
+  - id: evt_late_reassignment
+    at_seconds: 300
+    description: "08:45 - Examination Office manually reassigns a room for Hall B due to a scheduling conflict."
+    classification: green
+
+  - id: evt_first_wrong_room_report
+    at_seconds: 420
+    description: "08:47 - First student report of arriving at the wrong exam room."
+    classification: green
+
+  - id: evt_support_ticket
+    at_seconds: 480
+    description: "08:48 - Support ticket opened."
+    classification: green
+
+agents:
+  - id: student
+    role: "Affected Student"
+    display_name: "Priya (Student)"
+    personality: >
+      A first-year student, a bit flustered from the mix-up, not technical
+      at all. Talks about what she personally experienced, not systems or
+      infrastructure. Friendly but a little stressed about missing part of
+      her exam.
+    provider: gemini
+    knowledge_ids:
+      - fact_student_mobile_app
+      - fact_student_checked_early
+    conditional_knowledge_ids: {}
+
+  - id: officer
+    role: "Examination Officer"
+    display_name: "Mr. Owusu (Examination Officer)"
+    personality: >
+      Calm, process-oriented, a bit defensive about whether his office made
+      a mistake. Focused on the human process of reassigning rooms, not the
+      technology behind it. Will explain the manual reassignment process if
+      asked, but doesn't know anything about databases.
+    provider: groq
+    knowledge_ids:
+      - fact_officer_manual_reassignment
+      - fact_officer_no_pattern_by_room
+    conditional_knowledge_ids: {}
+
+  - id: developer
+    role: "Software Developer"
+    display_name: "Sam (Developer)"
+    personality: >
+      Precise, slightly defensive about the write path being correct,
+      curious and collaborative once trust is established. Understands the
+      application and database layer well but defers to infrastructure for
+      anything below the application.
+    provider: gemini
+    knowledge_ids:
+      - fact_developer_write_path
+      - fact_developer_display_board_source
+      - fact_developer_no_cache_bug
+      - fact_false_lead_permissions
+    conditional_knowledge_ids: {}
+
+  - id: infrastructure
+    role: "Infrastructure Engineer"
+    display_name: "Dana (Infrastructure Engineer)"
+    personality: >
+      Methodical, enjoys graphs and metrics, will volunteer more detail the
+      more specifically she is asked. Doesn't jump to conclusions but will
+      confirm patterns when asked directly about replication or timing.
+    provider: groq
+    knowledge_ids:
+      - fact_infra_replication_lag_exists
+      - fact_infra_batch_job
+      - fact_false_lead_network
+    conditional_knowledge_ids:
+      # Only reveals the smoking-gun correlation once the contestant has
+      # already found both the batch job fact AND the replica-source fact.
+      fact_infra_batch_job_load:
+        - fact_infra_batch_job
+        - fact_developer_display_board_source
+      fact_infra_no_read_consistency_guarantee:
+        - fact_infra_batch_job_load
+
+evaluation:
+  invariants:
+    - read_your_writes_on_critical_path
+    - no_assignment_divergence_after_commit
+  known_mechanisms:
+    - read_your_writes
+    - synchronous_replication
+    - route_critical_reads_to_primary
+    - versioned_writes
+    - cache_invalidation
+    - monotonic_reads
+    - quorum_reads
+  tests:
+    - id: identifies_correct_root_cause
+      description: "Solution correctly identifies replication lag / stale reads as the root cause"
+      check: identifies_root_cause
+      params:
+        accepted_root_cause_ids: [stale_read_replica_divergence]
+      required: true
+    - id: proposes_valid_consistency_fix
+      description: "Solution proposes a mechanism that actually establishes read-your-writes or equivalent consistency on the critical path"
+      check: requires_any_mechanism
+      params:
+        any_of:
+          - read_your_writes
+          - synchronous_replication
+          - route_critical_reads_to_primary
+          - monotonic_reads
+          - quorum_reads
+      required: true
+    - id: does_not_rely_on_irrelevant_fix
+      description: "Solution does not rely purely on caching fixes, which do not address the underlying consistency problem"
+      check: forbids_mechanism
+      params:
+        none_of:
+          - cache_invalidation
+      required: false
+
+solution_schema:
+  - root_cause
+  - explanation
+  - proposed_solution
+  - implementation

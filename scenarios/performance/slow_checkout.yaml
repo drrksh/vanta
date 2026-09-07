@@ -1,0 +1,265 @@
+id: slow_checkout
+title: "The Slow Checkout"
+domain: performance
+seed: 55555
+briefing: >
+  An e-commerce platform's checkout flow becomes extremely slow during
+  unpredictable periods -- sometimes fine for hours, then suddenly taking
+  10-30 seconds per checkout for a stretch of 15-20 minutes before
+  recovering on its own. All servers report healthy CPU and memory. Users
+  are not getting errors, just painful latency. Determine what is
+  happening.
+
+difficulty:
+  technical_depth: 0.7
+  information_sparsity: 0.55
+  contradiction: 0.3
+  false_leads: 3
+  agent_count: 4
+  evidence_noise: 0.15
+  event_complexity: 0.45
+  experiment_cost: 0.25
+  solution_complexity: 0.65
+  adversarial_pressure: 0.1
+  dynamicity: 0.35
+
+ground_truth:
+  root_cause_id: connection_pool_exhaustion_retry_amplification
+  root_cause_summary: >
+    The checkout service's database connection pool is undersized relative
+    to peak concurrent checkout load. When a short burst of slightly slower
+    queries occurs (e.g. during routine index maintenance), requests start
+    queueing for a free connection. The checkout service's HTTP client has
+    an aggressive retry policy with no backoff and no circuit breaker: when
+    a request times out waiting for a connection, it immediately retries,
+    which adds another request competing for the same scarce pool of
+    connections. This retry amplification snowballs the queue depth far
+    beyond the original slowdown, turning a brief, minor blip into a
+    15-20 minute self-sustaining latency spike, until enough requests
+    finally time out and abandon retrying that the queue drains and the
+    system recovers on its own.
+  mechanism: >
+    Small trigger (periodic index maintenance job causing brief query
+    slowdown) -> undersized DB connection pool queues requests ->
+    aggressive immediate-retry-with-no-backoff policy multiplies effective
+    load on the same scarce pool -> retry storm sustains the outage well
+    past the original trigger -> eventually self-resolves as clients give
+    up retrying.
+  hidden_state:
+    pool_size: 20
+    peak_concurrent_checkouts_needed: 45
+    retry_policy: "immediate retry, no backoff, up to 3 attempts"
+    maintenance_job_name: "nightly_index_rebuild (also runs at reduced scope hourly)"
+
+facts:
+  - id: fact_public_symptom
+    text: "Checkout sometimes takes 10-30 seconds instead of the usual under-1-second response, for stretches of 15-20 minutes."
+    classification: green
+    tags: [symptom]
+
+  - id: fact_public_servers_healthy
+    text: "CPU and memory on all checkout service instances look normal even during the slow periods."
+    classification: green
+    tags: [symptom, false_lead_elimination]
+
+  - id: fact_public_self_resolves
+    text: "The slowdown always resolves on its own after 15-20 minutes without anyone doing anything."
+    classification: green
+    tags: [symptom]
+
+  - id: fact_support_no_errors
+    text: "Customers report the checkout is slow, not broken -- it does eventually complete, just very slowly."
+    classification: yellow
+    tags: [symptom]
+
+  - id: fact_support_no_pattern_time_of_day
+    text: "It doesn't seem to happen at the same time every day, which makes it hard for us to predict or reproduce on demand."
+    classification: yellow
+    tags: [symptom, contradiction]
+
+  - id: fact_backend_dev_db_pool_config
+    text: "The checkout service maintains a fixed-size database connection pool, sized based on estimates from about a year ago before traffic grew."
+    classification: yellow
+    tags: [architecture, root_cause_adjacent]
+
+  - id: fact_backend_dev_retry_logic
+    text: "If a database call doesn't respond in time, our HTTP client for that call is configured to retry immediately, up to 3 times, to try to paper over transient blips."
+    classification: yellow
+    tags: [architecture, root_cause]
+
+  - id: fact_backend_dev_false_lead_deploy
+    text: "We checked our deployment history -- there hasn't been a checkout service deploy in the two weeks before these incidents started, so it's not a regression from a recent release."
+    classification: yellow
+    tags: [false_lead]
+
+  - id: fact_dba_maintenance_job
+    text: "There's a routine index maintenance job that runs on a schedule -- a full rebuild nightly, and a lighter, reduced-scope version hourly to keep statistics fresh."
+    classification: yellow
+    tags: [infrastructure, root_cause_adjacent]
+
+  - id: fact_dba_maintenance_correlation
+    text: "When I cross-referenced the timing, several of the reported slow periods do line up with when that hourly maintenance job was running or had just finished."
+    classification: yellow
+    tags: [root_cause]
+
+  - id: fact_dba_pool_saturation
+    text: "During those windows, our connection pool metrics show the pool completely saturated -- every connection in use, with requests queueing for one to free up."
+    classification: yellow
+    tags: [root_cause]
+
+  - id: fact_dba_false_lead_disk
+    text: "We also checked disk I/O and it's well within normal range during these incidents, so it's not a storage bottleneck by itself."
+    classification: yellow
+    tags: [false_lead]
+
+  - id: fact_sre_queue_depth_snowballs
+    text: "What's interesting is the queue depth doesn't just spike and plateau -- it keeps climbing well past what the maintenance job alone should cause, then falls off a cliff once it recovers."
+    classification: yellow
+    tags: [root_cause_adjacent]
+
+  - id: fact_sre_false_lead_network
+    text: "We ruled out a network issue between the checkout service and the database -- latency between them stays flat and low throughout."
+    classification: yellow
+    tags: [false_lead]
+
+  - id: fact_sre_retry_storm_theory
+    text: "My working theory is that once requests start queueing for a connection, those same requests are timing out and retrying, which just adds more competing requests to the same queue -- a retry storm feeding on itself."
+    classification: yellow
+    tags: [root_cause]
+
+  - id: fact_red_exact_pool_numbers
+    text: "Connection pool size is fixed at 20, but peak concurrent checkout load requires roughly 45 connections; retry policy has zero backoff across up to 3 attempts."
+    classification: red
+    tags: [ground_truth]
+
+  - id: fact_red_root_cause_statement
+    text: "Root cause: undersized DB connection pool combined with an aggressive no-backoff retry policy causes retry amplification once the pool briefly saturates during periodic index maintenance."
+    classification: red
+    tags: [ground_truth]
+
+timeline:
+  - id: evt_maintenance_starts
+    at_seconds: 0
+    description: "Hourly index maintenance job begins, briefly slowing some queries."
+    classification: yellow
+    hidden_until_discovered: true
+
+  - id: evt_pool_saturates
+    at_seconds: 120
+    description: "Connection pool saturates as queries queue behind the maintenance-induced slowdown."
+    classification: yellow
+    hidden_until_discovered: true
+
+  - id: evt_first_slow_reports
+    at_seconds: 300
+    description: "First customer reports of slow checkout begin."
+    classification: green
+
+  - id: evt_self_resolves
+    at_seconds: 1200
+    description: "Latency spike resolves on its own as retry storm subsides."
+    classification: green
+
+agents:
+  - id: support_agent
+    role: "Customer Support Agent"
+    display_name: "Lena (Support Agent)"
+    personality: >
+      Empathetic to frustrated customers, describes symptoms from tickets,
+      not technical at all, doesn't know infrastructure details.
+    provider: gemini
+    knowledge_ids:
+      - fact_support_no_errors
+      - fact_support_no_pattern_time_of_day
+    conditional_knowledge_ids: {}
+
+  - id: backend_developer
+    role: "Backend Developer"
+    display_name: "Omar (Backend Developer)"
+    personality: >
+      Confident about the application code, defensive about it not being a
+      recent regression, willing to discuss connection pool and retry
+      configuration in detail if asked specifically.
+    provider: groq
+    knowledge_ids:
+      - fact_backend_dev_db_pool_config
+      - fact_backend_dev_retry_logic
+      - fact_backend_dev_false_lead_deploy
+    conditional_knowledge_ids: {}
+
+  - id: dba
+    role: "Database Administrator"
+    display_name: "Grace (DBA)"
+    personality: >
+      Precise, likes showing metrics and graphs, will volunteer the
+      maintenance-job correlation once asked about timing or scheduled
+      jobs.
+    provider: gemini
+    knowledge_ids:
+      - fact_dba_maintenance_job
+      - fact_dba_false_lead_disk
+    conditional_knowledge_ids:
+      fact_dba_maintenance_correlation:
+        - fact_dba_maintenance_job
+      fact_dba_pool_saturation:
+        - fact_backend_dev_db_pool_config
+
+  - id: sre
+    role: "Site Reliability Engineer"
+    display_name: "Yuki (SRE)"
+    personality: >
+      Systems-thinking, good at spotting feedback loops, speaks in terms of
+      queues, saturation, and cascading failure once the contestant has
+      gathered enough pieces.
+    provider: groq
+    knowledge_ids:
+      - fact_sre_false_lead_network
+    conditional_knowledge_ids:
+      fact_sre_queue_depth_snowballs:
+        - fact_dba_pool_saturation
+      fact_sre_retry_storm_theory:
+        - fact_sre_queue_depth_snowballs
+        - fact_backend_dev_retry_logic
+
+evaluation:
+  invariants:
+    - no_unbounded_retry_amplification
+    - graceful_degradation_under_saturation
+  known_mechanisms:
+    - exponential_backoff_with_jitter
+    - circuit_breaker
+    - increase_connection_pool_size
+    - request_queue_admission_control
+    - bulkhead_isolation
+    - retry_budget
+  tests:
+    - id: identifies_correct_root_cause
+      description: "Solution correctly identifies connection pool exhaustion + retry amplification"
+      check: identifies_root_cause
+      params:
+        accepted_root_cause_ids: [connection_pool_exhaustion_retry_amplification]
+      required: true
+    - id: addresses_retry_behavior
+      description: "Solution fixes the retry policy itself (backoff, circuit breaker, or retry budget)"
+      check: requires_any_mechanism
+      params:
+        any_of:
+          - exponential_backoff_with_jitter
+          - circuit_breaker
+          - retry_budget
+      required: true
+    - id: addresses_capacity_or_isolation
+      description: "Solution also addresses capacity/isolation, not just retries alone"
+      check: requires_any_mechanism
+      params:
+        any_of:
+          - increase_connection_pool_size
+          - request_queue_admission_control
+          - bulkhead_isolation
+      required: false
+
+solution_schema:
+  - root_cause
+  - explanation
+  - proposed_solution
+  - implementation

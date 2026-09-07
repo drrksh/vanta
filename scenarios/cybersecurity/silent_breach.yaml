@@ -1,0 +1,271 @@
+id: silent_breach
+title: "The Silent Breach"
+domain: cybersecurity
+seed: 31337
+briefing: >
+  A company's internal system logged a burst of unusual account activity
+  overnight. Nobody reported a phishing email, no malware was detected by
+  antivirus, and no systems appear to be down. The security team knows
+  something happened, but cannot yet determine how the attacker got in.
+  Determine what happened: the attack path, the affected component, and an
+  appropriate remediation.
+
+difficulty:
+  technical_depth: 0.85
+  information_sparsity: 0.7
+  contradiction: 0.4
+  false_leads: 3
+  agent_count: 4
+  evidence_noise: 0.2
+  event_complexity: 0.5
+  experiment_cost: 0.3
+  solution_complexity: 0.75
+  adversarial_pressure: 0.6
+  dynamicity: 0.3
+
+ground_truth:
+  root_cause_id: leaked_api_key_credential_stuffing_pivot
+  root_cause_summary: >
+    A developer accidentally committed a third-party API key (for an
+    internal analytics service) to a public code repository three weeks
+    ago. An attacker's automated credential-scanning bot found the key.
+    That API integration had broader access than intended -- it could read
+    from the same authentication database used for internal single sign-on
+    session tokens, due to an overly broad database user grant made during
+    a rushed setup. The attacker used the leaked key to query that database
+    directly (bypassing the API layer's normal authorization checks
+    entirely), harvested valid session tokens, and replayed one of them to
+    access internal tools as a legitimate-looking session -- which is why
+    it didn't trigger a failed-login alert and looked like unusual-but-
+    authenticated activity rather than a break-in.
+  mechanism: >
+    Credential leak (API key in public repo) -> overly broad database
+    grant scoped to that API key -> direct database query bypassing
+    application-layer authorization -> session token harvesting -> session
+    replay for lateral access. No malware and no phishing were involved,
+    which is why antivirus and the phishing filter found nothing.
+  hidden_state:
+    leaked_key_service: "internal-analytics-api"
+    leak_location: "public GitHub repo, commit from 3 weeks ago"
+    db_grant_scope: "read access to session_tokens table (unintended)"
+    replayed_session_role: "IT support technician"
+
+facts:
+  - id: fact_public_symptom
+    text: "Overnight, monitoring flagged a burst of unusual account activity on internal tools."
+    classification: green
+    tags: [symptom]
+
+  - id: fact_public_no_malware
+    text: "Antivirus and endpoint detection tools found no malware on any affected machine."
+    classification: green
+    tags: [symptom, false_lead_elimination]
+
+  - id: fact_public_no_downtime
+    text: "No systems went down and no ransom note or defacement occurred -- this doesn't look like a typical outage-causing attack."
+    classification: green
+    tags: [symptom]
+
+  - id: fact_soc_no_failed_logins
+    text: "We don't see a spike in failed login attempts before the unusual activity started, which is unusual for a brute-force or credential-stuffing attack against the login page itself."
+    classification: yellow
+    tags: [symptom, contradiction]
+
+  - id: fact_soc_activity_looked_legitimate
+    text: "The unusual activity used what looked like a valid, already-authenticated session -- it wasn't flagged as a new suspicious login, just an existing session doing atypical things."
+    classification: yellow
+    tags: [root_cause_adjacent]
+
+  - id: fact_soc_false_lead_phishing
+    text: "We checked recent phishing campaigns targeting the company -- there was one two weeks ago, but none of the affected accounts clicked the link based on email gateway logs."
+    classification: yellow
+    tags: [false_lead]
+
+  - id: fact_dev_recent_api_integration
+    text: "About three weeks ago, we integrated a third-party analytics service into one of our internal tools, which required setting up a new API key and a supporting database user."
+    classification: yellow
+    tags: [change, root_cause_adjacent]
+
+  - id: fact_dev_key_in_repo_history
+    text: "Looking back, I think that API key might have accidentally ended up committed to our repository at some point during setup -- I'd have to check if that repo is public."
+    classification: yellow
+    tags: [root_cause]
+
+  - id: fact_dev_false_lead_dependency
+    text: "We did update a few npm dependencies around that time too, but none of them have any known CVEs as far as I can tell."
+    classification: yellow
+    tags: [false_lead]
+
+  - id: fact_dba_grant_scope_broad
+    text: "When we set up the database user for that analytics integration, it was given read access to more tables than it strictly needed, including the session tokens table -- that was meant to be temporary during testing but was never narrowed."
+    classification: yellow
+    tags: [root_cause]
+
+  - id: fact_dba_no_direct_db_alerts
+    text: "Our alerting is mostly built around the application layer's authorization checks -- a direct database query using valid database credentials wouldn't necessarily trigger those same alerts."
+    classification: yellow
+    tags: [root_cause_adjacent]
+
+  - id: fact_dba_false_lead_backup
+    text: "We also checked whether a backup file was exposed somewhere, but all backup storage access logs look normal."
+    classification: yellow
+    tags: [false_lead]
+
+  - id: fact_security_engineer_repo_is_public
+    text: "I confirmed the repository in question is public, and yes, there's a commit in its history containing what looks like a live API key for the analytics integration."
+    classification: yellow
+    tags: [root_cause]
+
+  - id: fact_security_engineer_session_replay_theory
+    text: "Our working theory is that whoever got that key found a way to pull session tokens and reuse one, since the activity pattern matches an existing authenticated session rather than a fresh login."
+    classification: yellow
+    tags: [root_cause]
+
+  - id: fact_security_engineer_scanning_bots
+    text: "Public API key leaks get found by automated scanning bots within hours to days in general, which lines up with the timeline here."
+    classification: yellow
+    tags: [root_cause_adjacent]
+
+  - id: fact_red_exact_attack_chain
+    text: "Attacker used automated GitHub secret-scanning to find the leaked analytics API key, used its overly-broad DB grant to query session_tokens directly, and replayed a harvested IT-support-technician session token for lateral access."
+    classification: red
+    tags: [ground_truth]
+
+  - id: fact_red_root_cause_statement
+    text: "Root cause: leaked API key with an overly broad database grant, exploited via direct database access and session token replay, not phishing or malware."
+    classification: red
+    tags: [ground_truth]
+
+timeline:
+  - id: evt_key_committed
+    at_seconds: -1814400
+    description: "3 weeks ago - Analytics API key accidentally committed to a public repository."
+    classification: yellow
+    hidden_until_discovered: true
+
+  - id: evt_key_scanned
+    at_seconds: -172800
+    description: "2 days ago (estimated) - Automated secret-scanning bot likely discovered the leaked key."
+    classification: yellow
+    hidden_until_discovered: true
+
+  - id: evt_unusual_activity
+    at_seconds: 0
+    description: "Overnight - Unusual account activity flagged by monitoring."
+    classification: green
+
+  - id: evt_soc_investigation_starts
+    at_seconds: 3600
+    description: "1 hour later - Security team begins investigation."
+    classification: green
+
+agents:
+  - id: soc_analyst
+    role: "SOC Analyst"
+    display_name: "Reyna (SOC Analyst)"
+    personality: >
+      Sharp, slightly cautious, speaks in terms of alerts and detection
+      coverage. Wants to rule out the obvious (malware, phishing,
+      brute-force) before speculating further.
+    provider: gemini
+    knowledge_ids:
+      - fact_soc_no_failed_logins
+      - fact_soc_activity_looked_legitimate
+      - fact_soc_false_lead_phishing
+    conditional_knowledge_ids: {}
+
+  - id: developer
+    role: "Backend Developer"
+    display_name: "Théo (Backend Developer)"
+    personality: >
+      A little embarrassed once the API key topic comes up, otherwise
+      helpful and technically precise about the analytics integration he
+      built three weeks ago.
+    provider: groq
+    knowledge_ids:
+      - fact_dev_recent_api_integration
+      - fact_dev_false_lead_dependency
+    conditional_knowledge_ids:
+      fact_dev_key_in_repo_history:
+        - fact_dev_recent_api_integration
+
+  - id: dba
+    role: "Database Administrator"
+    display_name: "Priyanka (DBA)"
+    personality: >
+      Methodical, owns up to the overly broad grant once asked directly,
+      thinks in terms of access control and least privilege.
+    provider: gemini
+    knowledge_ids:
+      - fact_dba_no_direct_db_alerts
+      - fact_dba_false_lead_backup
+    conditional_knowledge_ids:
+      fact_dba_grant_scope_broad:
+        - fact_dev_recent_api_integration
+
+  - id: security_engineer
+    role: "Security Engineer"
+    display_name: "Marcus (Security Engineer)"
+    personality: >
+      Investigative, connects dots across other agents' findings once the
+      contestant has done some legwork, cautious about stating a theory
+      until there's supporting evidence.
+    provider: groq
+    knowledge_ids:
+      - fact_security_engineer_scanning_bots
+    conditional_knowledge_ids:
+      fact_security_engineer_repo_is_public:
+        - fact_dev_key_in_repo_history
+      fact_security_engineer_session_replay_theory:
+        - fact_security_engineer_repo_is_public
+        - fact_dba_grant_scope_broad
+
+evaluation:
+  invariants:
+    - least_privilege_db_access
+    - secret_scanning_on_commits
+    - session_token_integrity
+  known_mechanisms:
+    - revoke_and_rotate_leaked_credentials
+    - least_privilege_db_grants
+    - pre_commit_secret_scanning
+    - session_token_binding
+    - short_lived_tokens
+    - db_query_anomaly_detection
+    - remove_direct_db_access_for_service_accounts
+  tests:
+    - id: identifies_correct_root_cause
+      description: "Solution correctly identifies the leaked-key + broad-grant + session-replay chain"
+      check: identifies_root_cause
+      params:
+        accepted_root_cause_ids: [leaked_api_key_credential_stuffing_pivot]
+      required: true
+    - id: proposes_credential_hygiene_fix
+      description: "Solution addresses the leaked credential itself (rotation/scanning)"
+      check: requires_any_mechanism
+      params:
+        any_of:
+          - revoke_and_rotate_leaked_credentials
+          - pre_commit_secret_scanning
+      required: true
+    - id: proposes_access_control_fix
+      description: "Solution addresses the underlying overly-broad database grant, not just the leaked key"
+      check: requires_any_mechanism
+      params:
+        any_of:
+          - least_privilege_db_grants
+          - remove_direct_db_access_for_service_accounts
+          - db_query_anomaly_detection
+      required: true
+    - id: does_not_blame_malware
+      description: "Solution should not center on malware removal, since no malware was involved"
+      check: forbids_mechanism
+      params:
+        none_of: []
+      required: false
+
+solution_schema:
+  - root_cause
+  - explanation
+  - proposed_solution
+  - implementation
