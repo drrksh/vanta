@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.core.config import Settings
@@ -9,7 +10,7 @@ from app.models.orm import Base
 from app.scenarios.loader import ScenarioRegistry
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def db_sessionmaker():
     engine = create_async_engine("sqlite+aiosqlite:///:memory:", future=True)
     async with engine.begin() as conn:
@@ -19,7 +20,7 @@ async def db_sessionmaker():
     await engine.dispose()
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 def service(scenarios_dir):
     registry = ScenarioRegistry(scenarios_dir)
     settings = Settings(mock_llm=True, database_url="sqlite+aiosqlite:///:memory:")

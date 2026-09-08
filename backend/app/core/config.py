@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     admin_password: str = "change-me"
 
     # --- Scenario loading ---
-    scenarios_dir: str = "../scenarios"
+    scenarios_dir: str = "scenarios"
 
     # --- Security ---
     max_message_length: int = 2000
