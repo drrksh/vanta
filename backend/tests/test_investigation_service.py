@@ -9,7 +9,7 @@ from app.core.investigation_service import InvestigationService, NotFoundError
 from app.models.orm import Base
 from app.scenarios.loader import ScenarioRegistry
 
-
+# pytest needs to be paired with pytest_asyncio
 @pytest_asyncio.fixture
 async def db_sessionmaker():
     engine = create_async_engine("sqlite+aiosqlite:///:memory:", future=True)
@@ -19,7 +19,7 @@ async def db_sessionmaker():
     yield sm
     await engine.dispose()
 
-
+# pytest needs to be paired with pytest_asyncio
 @pytest_asyncio.fixture
 def service(scenarios_dir):
     registry = ScenarioRegistry(scenarios_dir)
