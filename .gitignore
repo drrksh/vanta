@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.venv/
+node_modules/
+dist/
+*.db
+vanta_worlds.db
+.env
+build/
+*.o
+*.out
+.pytest_cache/
