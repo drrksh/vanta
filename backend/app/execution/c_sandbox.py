@@ -70,9 +70,14 @@ class CRunResult:
 
 
 class CSandbox:
-    def __init__(self, timeout_seconds: float = 10.0, compiler: str = "gcc"):
+    def __init__(self, timeout_seconds: float = 10.0, compiler: str = "gcc", fast: bool = False):
         self.timeout_seconds = timeout_seconds
         self.compiler = compiler
+        # fast mode drops the sanitizers for speed. Used by the internal
+        # evolution loop, where throughput matters and the harness itself
+        # is trusted. Contestant-facing evaluation keeps sanitizers on so
+        # UB/overflow/out-of-bounds still count as failures.
+        self.fast = fast
 
     async def compile_and_run(
         self,
@@ -93,18 +98,17 @@ class CSandbox:
             candidate_path.write_text(shared_header + "\n" + candidate_source)
 
             binary_path = workdir / "a.out"
-            compile_cmd = [
-                self.compiler,
-                "-Wall",
-                "-Wextra",
-                "-fsanitize=undefined,address",
-                "-O0",
-                "-g",
-                str(harness_path),
-                str(candidate_path),
-                "-o",
-                str(binary_path),
-            ]
+            if self.fast:
+                compile_cmd = [
+                    self.compiler, "-w", "-O1",
+                    str(harness_path), str(candidate_path), "-o", str(binary_path),
+                ]
+            else:
+                compile_cmd = [
+                    self.compiler, "-Wall", "-Wextra",
+                    "-fsanitize=undefined,address", "-O0", "-g",
+                    str(harness_path), str(candidate_path), "-o", str(binary_path),
+                ]
             proc = await asyncio.create_subprocess_exec(
                 *compile_cmd,
                 stdout=asyncio.subprocess.PIPE,
