@@ -1,0 +1,82 @@
+@import "tailwindcss";
+
+/*
+  VANTA — "blueprint / forensic workbench" visual language.
+
+  The subject is a live, procedurally-generated BROKEN technical system the
+  contestant investigates: reads its real source, challenges its builders,
+  runs tests against fixes. So the surface reads as an engineering schematic
+  / incident console, not a dark terminal and not a cream editorial page.
+
+  - Deep ink-blue field with a faint blueprint grid (structure is the motif).
+  - Cool structural neutrals carry 95% of the UI; ONE warm signal (amber) is
+    reserved strictly for "something is wrong / your attention" — the whole
+    premise of a VANTA world.
+  - Verdicts have dedicated, non-decorative semantics: teal = accepted,
+    rust = rejected.
+*/
+
+:root {
+  --field: #0e1420;          /* page */
+  --panel: #141c2b;          /* raised surface */
+  --panel-2: #1b2638;        /* nested / inputs */
+  --line: #273449;           /* hairline */
+  --line-bright: #3a4c68;
+
+  --ink: #dde6f2;            /* primary text */
+  --ink-dim: #93a3bd;        /* secondary */
+  --ink-faint: #5f708d;      /* tertiary / labels */
+
+  --structure: #7fd1e8;      /* cool primary accent (links, structure) */
+  --signal: #e8a33d;         /* WARNING / needs attention — used sparingly */
+  --accepted: #58c7a6;       /* verdict: accepted */
+  --rejected: #d4725e;       /* verdict: rejected */
+
+  --display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --body: "Inter", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+
+  color-scheme: dark;
+}
+
+html, body, #root { height: 100%; }
+
+body {
+  margin: 0;
+  background-color: var(--field);
+  background-image:
+    linear-gradient(var(--line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--line) 1px, transparent 1px);
+  background-size: 44px 44px;
+  background-position: -1px -1px;
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Dim the grid so it reads as a watermark, not a cage. */
+body::before {
+  content: "";
+  position: fixed; inset: 0;
+  background: radial-gradient(ellipse at 50% 0%, transparent 0%, var(--field) 78%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+#root { position: relative; z-index: 1; }
+
+h1, h2, h3, .display { font-family: var(--display); letter-spacing: -0.01em; }
+code, pre, .mono { font-family: var(--mono); }
+
+::selection { background: color-mix(in srgb, var(--structure) 30%, transparent); color: #fff; }
+
+.vanta-focus:focus-visible { outline: 2px solid var(--structure); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
