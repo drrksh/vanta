@@ -1,0 +1,11 @@
+INFO:     Started server process [3524]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8811 (Press CTRL+C to quit)
+INFO:     127.0.0.1:35290 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35294 - "GET /api/archetypes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41862 - "POST /api/worlds HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41862 - "POST /api/worlds/c7a8ad46/submit HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41862 - "POST /api/worlds/c7a8ad46/submit HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41862 - "GET /api/admin/worlds/c7a8ad46 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41862 - "DELETE /api/worlds/c7a8ad46 HTTP/1.1" 200 OK
