@@ -36,8 +36,13 @@ _DOMAINS = [
     {"noun": "scan request", "machine": "document scanner", "place": "the library digitization desk"},
 ]
 
-_STRUCT_NAMES = ["Job", "Task", "Request", "WorkItem", "Ticket"]
-_FUNC_NAMES = ["chooseNext", "selectNext", "pickNextJob", "nextToRun", "scheduleNext"]
+# Identifier pools are wide on purpose: in a cohort, every member's world
+# gets a different (struct, function) pair, so nobody's code compiles against
+# anyone else's system.
+_STRUCT_NAMES = ["Job", "Task", "Request", "WorkItem", "Ticket", "Order", "Booking",
+                 "Submission", "QueueEntry", "Batch", "Run", "Commission"]
+_FUNC_VERBS = ["choose", "select", "pick", "schedule", "dispatch", "elect", "decide", "nominate"]
+_FUNC_TAILS = ["Next", "NextJob", "ToRun", "Upcoming", "Candidate", "NextUp", "Successor"]
 # Ordered roughly easy->subtle; bug_subtlety biases the pick toward the end.
 _BUG_VARIANTS = ["no_close_check", "pure_shortest_first", "truncating_priority"]
 
@@ -46,19 +51,24 @@ class StarvationArchetype(FlawArchetype):
     id = "starvation_fairness"
     title = "Shared Resource Fairness"
     domain = "resource_allocation"
+    variants = _BUG_VARIANTS
+    domain_count = len(_DOMAINS)
 
-    def generate(self, seed: int, genes: dict | None = None) -> GeneratedWorld:
+    def generate(self, seed: int, genes: dict | None = None,
+                 pins: dict | None = None) -> GeneratedWorld:
         genes = self.resolve_genes(genes)
         rng = self.rng(seed)
 
-        domain = rng.choice(_DOMAINS)
+        domain_index = rng.randrange(len(_DOMAINS))
         struct_name = rng.choice(_STRUCT_NAMES)
-        func_name = rng.choice(_FUNC_NAMES)
+        func_name = rng.choice(_FUNC_VERBS) + rng.choice(_FUNC_TAILS)
 
         # bug_subtlety biases which variant we pick: higher -> later (subtler).
         subtlety = genes["bug_subtlety"]
         weights = [1.0 - subtlety, 0.5, 0.3 + subtlety]
         bug_variant = rng.choices(_BUG_VARIANTS, weights=weights, k=1)[0]
+        bug_variant, domain_index = self.apply_pins(pins, bug_variant, domain_index)
+        domain = _DOMAINS[domain_index]
 
         # constant_magnitude scales the day length and job sizes.
         mag = genes["constant_magnitude"]
@@ -162,7 +172,7 @@ int {func_name}(struct {struct_name} jobs[], int count, int now, int minutesLeft
                 "day_length": day_length, "starve_bound": starve_bound,
                 "big_job_minutes": big_job_minutes, "big_submitted_at": big_submitted_at,
                 "small_job_minutes": small_job_minutes, "small_interval": small_interval,
-                "domain": domain,
+                "domain": domain, "domain_index": domain_index, "pins": pins or None,
             },
         )
 

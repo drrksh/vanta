@@ -81,11 +81,31 @@ class FlawArchetype(ABC):
     id: str
     title: str
     domain: str
+    # The bug variants this archetype can plant, and how many story domains
+    # it can frame them in. A cohort pins one of each so every member faces
+    # the same defect in the same setting, while names and constants still
+    # vary per member.
+    variants: list[str] = []
+    domain_count: int = 1
 
     @abstractmethod
-    def generate(self, seed: int, genes: dict | None = None) -> GeneratedWorld:
-        """Deterministic: the same (seed, genes) must always produce the same world."""
+    def generate(self, seed: int, genes: dict | None = None,
+                 pins: dict | None = None) -> GeneratedWorld:
+        """Deterministic: the same (seed, genes, pins) always produces the same
+        world. `pins` may fix {"variant": str, "domain": int}; everything else
+        still comes from the seed."""
         raise NotImplementedError
+
+    def random_pins(self, rng: random.Random) -> dict:
+        return {"variant": rng.choice(self.variants), "domain": rng.randrange(self.domain_count)}
+
+    def apply_pins(self, pins: dict | None, variant: str, domain_index: int) -> tuple[str, int]:
+        if pins:
+            if pins.get("variant") in self.variants:
+                variant = pins["variant"]
+            if isinstance(pins.get("domain"), int):
+                domain_index = pins["domain"] % self.domain_count
+        return variant, domain_index
 
     def rng(self, seed: int) -> random.Random:
         return random.Random(f"{self.id}:{seed}")

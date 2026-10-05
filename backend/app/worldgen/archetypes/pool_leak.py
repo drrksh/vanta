@@ -32,9 +32,13 @@ _DOMAINS = [
     {"noun": "kit", "unit": "locker", "place": "the equipment rental room"},
     {"noun": "laptop", "unit": "loaner unit", "place": "the IT help desk"},
 ]
-_STRUCT_NAMES = ["Slot", "Unit", "Holding", "Checkout", "Bay"]
-_CHECKOUT_FUNCS = ["checkoutItem", "acquireSlot", "reserveUnit", "takeSlot"]
-_RELEASE_FUNCS = ["releaseItem", "returnSlot", "freeUnit", "giveBackSlot"]
+# Wide identifier pools so cohort members never share a (struct, checkout,
+# release) triple -- one member's code won't compile against another's pool.
+_STRUCT_NAMES = ["Slot", "Unit", "Holding", "Checkout", "Bay", "Berth", "Locker", "Seat",
+                 "Lease", "Stall", "Dock", "Pod"]
+_CHECKOUT_VERBS = ["checkout", "acquire", "reserve", "take", "claim", "lease", "borrow", "grab"]
+_RELEASE_VERBS = ["release", "return", "free", "giveBack", "surrender", "drop", "vacate", "handBack"]
+_FUNC_NOUNS = ["Item", "Slot", "Unit", "Spot", "One", "Space"]
 _BUG_VARIANTS = ["linear_search_first_match", "off_by_one_index", "no_double_checkout_guard"]
 
 
@@ -42,15 +46,21 @@ class PoolLeakArchetype(FlawArchetype):
     id = "pool_leak"
     title = "Resource Pool Integrity"
     domain = "resource_pool"
+    variants = _BUG_VARIANTS
+    domain_count = len(_DOMAINS)
 
-    def generate(self, seed: int, genes: dict | None = None) -> GeneratedWorld:
+    def generate(self, seed: int, genes: dict | None = None,
+                 pins: dict | None = None) -> GeneratedWorld:
         genes = self.resolve_genes(genes)
         rng = self.rng(seed)
-        domain = rng.choice(_DOMAINS)
+        domain_index = rng.randrange(len(_DOMAINS))
         struct_name = rng.choice(_STRUCT_NAMES)
-        checkout_func = rng.choice(_CHECKOUT_FUNCS)
-        release_func = rng.choice(_RELEASE_FUNCS)
+        noun = rng.choice(_FUNC_NOUNS)
+        checkout_func = rng.choice(_CHECKOUT_VERBS) + noun
+        release_func = rng.choice(_RELEASE_VERBS) + rng.choice(_FUNC_NOUNS)
         bug_variant = rng.choice(_BUG_VARIANTS)
+        bug_variant, domain_index = self.apply_pins(pins, bug_variant, domain_index)
+        domain = _DOMAINS[domain_index]
 
         mag = genes["constant_magnitude"]
         pool_size = rng.choice([10, 12, 16, 20, 24])
@@ -118,6 +128,7 @@ int {release_func}(struct {struct_name} pool[], int poolSize, int holderId);
                 "struct_name": struct_name, "checkout_func": checkout_func,
                 "release_func": release_func, "bug_variant": bug_variant,
                 "pool_size": pool_size, "cycle_count": cycle_count, "domain": domain,
+                "domain_index": domain_index, "pins": pins or None,
             },
         )
 

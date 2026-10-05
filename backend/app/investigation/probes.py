@@ -47,7 +47,8 @@ def world_params(world: GeneratedWorld) -> dict:
         return world.params
     from app.worldgen.registry import ARCHETYPES_BY_ID
 
-    regenerated = ARCHETYPES_BY_ID[world.archetype_id].generate(world.seed, world.genes)
+    regenerated = ARCHETYPES_BY_ID[world.archetype_id].generate(
+        world.seed, world.genes, pins=(world.params or {}).get("pins"))
     world.params = regenerated.params
     return world.params
 

@@ -160,11 +160,12 @@ class EvolutionEngine:
         target_difficulty: float = 0.5,
         population: int = 6,
         generations: int = 4,
+        pins: dict | None = None,
     ) -> EvolvedWorld:
         """Run the evolutionary loop and return the best viable world found.
         Falls back to the best candidate seen if none is fully viable within
         the budget (rare; the caller can retry with a new base_seed)."""
-        rng = random.Random(f"evolve:{archetype.id}:{base_seed}:{target_difficulty}")
+        rng = random.Random(f"evolve:{archetype.id}:{base_seed}:{target_difficulty}:{sorted((pins or {}).items())}")
         base_genes = self._target_vector(target_difficulty)
 
         # Initial population: base genes plus mutated variants, distinct seeds.
@@ -176,7 +177,7 @@ class EvolutionEngine:
         import asyncio
         for gen in range(generations):
             worlds = [
-                archetype.generate(base_seed * 1000 + gen * 100 + i, genes)
+                archetype.generate(base_seed * 1000 + gen * 100 + i, genes, pins=pins)
                 for i, genes in enumerate(pop_genes)
             ]
             # Evaluate the whole population concurrently -- each fitness check

@@ -32,6 +32,7 @@ async def generate_world(
     archetype_id: str | None = None,
     engine: EvolutionEngine | None = None,
     max_restarts: int = 3,
+    pins: dict | None = None,
 ) -> EvolvedWorld:
     """Evolve a viable world. If `archetype_id` is given, use that archetype;
     otherwise pick one deterministically from the seed so the flaw category
@@ -52,7 +53,7 @@ async def generate_world(
         seed = session_seed if attempt == 0 else session_seed * 7919 + attempt
         evolved = await engine.evolve(
             archetype, base_seed=seed, target_difficulty=target_difficulty,
-            population=6, generations=3,
+            population=6, generations=3, pins=pins,
         )
         last = evolved
         if evolved.fitness.viable:

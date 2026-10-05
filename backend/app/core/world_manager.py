@@ -88,12 +88,13 @@ class WorldManager:
     async def create_world(
         self, created_by: str, seed: int | None = None,
         target_difficulty: float = 0.5, archetype_id: str | None = None,
+        pins: dict | None = None,
     ) -> WorldRecord:
         if seed is None:
             seed = uuid.uuid4().int % (2**31)
         evolved = await generate_world(
             seed, target_difficulty=target_difficulty,
-            archetype_id=archetype_id, engine=self.engine,
+            archetype_id=archetype_id, engine=self.engine, pins=pins,
         )
         world = evolved.world
         fitness = {
