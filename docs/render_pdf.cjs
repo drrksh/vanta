@@ -7,7 +7,7 @@ try { ({ chromium } = require('playwright')) } catch {
 const path = require('path')
 
 ;(async () => {
-  const [input, output, footer] = process.argv.slice(2)
+  const [input, output, footer, label = 'VANTA · Technical documentation'] = process.argv.slice(2)
   const browser = await chromium.launch()
   const page = await browser.newPage()
   await page.goto('file://' + path.resolve(input), { waitUntil: 'load' })
@@ -24,7 +24,7 @@ const path = require('path')
     headerTemplate: '<span></span>',
     footerTemplate: withFooter
       ? `<div style="width:100%;font-family:Inter,sans-serif;font-size:7.5pt;color:#7a8394;padding:0 17mm;display:flex;justify-content:space-between;">
-           <span>VANTA · Technical documentation</span>
+           <span>${label}</span>
            <span><span class="pageNumber"></span> / <span class="totalPages"></span></span></div>`
       : '<span></span>',
   })

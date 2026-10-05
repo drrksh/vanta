@@ -1,7 +1,8 @@
 """
-Build docs/VANTA-Technical-Documentation.pdf from docs/src/*.md.
+Build the VANTA PDFs from Markdown sources.
 
-    python3 docs/build_docs.py
+    python3 docs/build_docs.py              # technical documentation (docs/src)
+    python3 docs/build_docs.py strategy     # scope & strategy (docs/strategy/src)
 
 Pipeline: Markdown -> HTML (numbered chapters/sections, highlighted code,
 inline SVG diagrams) -> PDF with headless Chromium (Playwright). Two passes:
@@ -25,10 +26,38 @@ from pypdf import PdfReader, PdfWriter
 
 DOCS = Path(__file__).resolve().parent
 ROOT = DOCS.parent
-SRC = DOCS / "src"
-BUILD = DOCS / "build"
-OUT = DOCS / "VANTA-Technical-Documentation.pdf"
 RENDER = DOCS / "render_pdf.cjs"
+
+DOCSETS = {
+    "technical": {
+        "src": DOCS / "src",
+        "out": DOCS / "VANTA-Technical-Documentation.pdf",
+        "title": "VANTA — Technical documentation",
+        "subject": "Every concept, feature and file of the VANTA project",
+        "footer": "VANTA · Technical documentation",
+        "tag": "technical documentation",
+        "motto": '"Don\'t give the contestant a problem. <em>Give them a world.</em>"',
+        "what": ("A complete guide to the project: every concept, every feature, every file, the "
+                 "HTTP API, the database, the C protocols, testing, operations, limitations, how to "
+                 "extend it, and how to present it."),
+        "stats": None,  # computed from the repository
+    },
+    "strategy": {
+        "src": DOCS / "strategy" / "src",
+        "out": DOCS / "VANTA-Scope-and-Strategy.pdf",
+        "title": "VANTA — Scope, learning, competition and industry strategy",
+        "subject": "What VANTA is for, how students learn with it, competition formats, and a path to industry",
+        "footer": "VANTA · Scope & strategy",
+        "tag": "scope · learning · competition · industry",
+        "motto": 'One engine that generates broken systems. <em>Three things built on it: learn, compete, assess.</em>',
+        "what": ("What VANTA's scope really is, how to make students learn from it, how to run "
+                 "Battlecode-, ICPC- and hackathon-style competitions with DSA and competitive "
+                 "programming inside, and how it could succeed as an industry product."),
+        "stats": [("product modes", "3"), ("competition formats", "6"),
+                  ("proposed defect classes", "20"), ("roadmap phases", "4")],
+    },
+}
+DS = DOCSETS["technical"]
 
 CSS = r"""
 @page { size: A4; margin: 17mm 17mm 19mm 17mm; }
@@ -147,7 +176,7 @@ def repo_stats() -> dict:
 
 
 def build_body(page_map: dict[str, int] | None) -> tuple[str, list[dict]]:
-    chapters = sorted(SRC.glob("*.md"))
+    chapters = sorted(DS["src"].glob("*.md"))
     toc: list[dict] = []
     parts: list[str] = []
     for ci, path in enumerate(chapters, start=1):
@@ -164,6 +193,7 @@ def build_body(page_map: dict[str, int] | None) -> tuple[str, list[dict]]:
                                                          errors="ignore"))), text)
         body = md.convert(text)
         sec = 0
+        chap_num = [str(ci)]
         # Number chapter (h1) and section (h2) headings, and collect TOC entries.
         def number(m):
             nonlocal sec
@@ -172,11 +202,21 @@ def build_body(page_map: dict[str, int] | None) -> tuple[str, list[dict]]:
             hid = hid.group(1) if hid else ""
             title = _slug_num(inner)
             if tag == "h1":
-                toc.append({"level": 1, "num": f"{ci}", "title": title, "id": hid})
+                app = re.match(r"Appendix ([A-Z]): (.*)", title)
+                if app:
+                    chap_num[0] = app.group(1)
+                    toc.append({"level": 1, "num": app.group(1), "title": app.group(2), "id": hid,
+                                "label": f"Appendix {app.group(1)}"})
+                    inner2 = re.sub(r"Appendix [A-Z]: ", "", inner, count=1)
+                    return f'<h1{attrs}><span class="num">Appendix {app.group(1)} </span>{inner2}</h1>'
+                chap_num[0] = str(ci)
+                toc.append({"level": 1, "num": f"{ci}", "title": title, "id": hid,
+                            "label": f"Chapter {ci}"})
                 return f'<h1{attrs}><span class="num">Chapter {ci} </span>{inner}</h1>'
             sec += 1
-            toc.append({"level": 2, "num": f"{ci}.{sec}", "title": title, "id": hid})
-            return f'<h2{attrs}><span class="num">{ci}.{sec} </span>{inner}</h2>'
+            toc.append({"level": 2, "num": f"{chap_num[0]}.{sec}", "title": title, "id": hid,
+                        "label": f"{chap_num[0]}.{sec}"})
+            return f'<h2{attrs}><span class="num">{chap_num[0]}.{sec} </span>{inner}</h2>'
         body = re.sub(r"<(h1|h2)([^>]*)>(.*?)</\1>", number, body, flags=re.S)
         parts.append(f'<section class="chapter">{body}</section>')
 
@@ -189,7 +229,7 @@ def build_body(page_map: dict[str, int] | None) -> tuple[str, list[dict]]:
                     f'<span class="dots"></span><span class="pg">{pg}</span></a></li>')
     toc_html = f'<section class="toc"><h1 id="contents">Contents</h1><ol>{"".join(rows)}</ol></section>'
     pyg = HtmlFormatter(style="friendly").get_style_defs(".hl")
-    doc = (f'<!doctype html><html><head><meta charset="utf-8"><title>VANTA — Technical documentation</title>'
+    doc = (f'<!doctype html><html><head><meta charset="utf-8"><title>{DS["title"]}</title>'
            f'<style>{CSS}\n{pyg}\n.hl {{ background: transparent; }}</style></head>'
            f'<body>{toc_html}{"".join(parts)}</body></html>')
     return doc, toc
@@ -197,30 +237,29 @@ def build_body(page_map: dict[str, int] | None) -> tuple[str, list[dict]]:
 
 def build_cover(stats: dict) -> str:
     today = dt.date.today().strftime("%d %B %Y")
+    boxes = DS["stats"] or [("tracked files", str(stats["files"])),
+                            ("lines of code", f"{stats['lines']:,}"),
+                            ("automated tests", str(stats["test_cases"])),
+                            ("defect classes", "2")]
+    stat_html = "".join(f'<div class="stat"><div class="k">{k}</div><div class="v">{v}</div></div>'
+                        for k, v in boxes)
     return f"""<!doctype html><html><head><meta charset="utf-8"><style>{COVER_CSS}</style></head><body>
 <div class="cover"><div class="grid"></div><div class="glow"></div>
 <div class="inner">
-  <div class="tag"><span class="dot"></span>technical documentation</div>
+  <div class="tag"><span class="dot"></span>{DS["tag"]}</div>
   <h1>VANTA</h1>
   <p class="expand">Virtualized Adversarial Network &amp; Technical Assessment</p>
-  <p class="motto">"Don't give the contestant a problem. <em>Give them a world.</em>"</p>
-  <p class="what">A complete guide to the project: every concept, every feature, every file, the
-  HTTP API, the database, the C protocols, testing, operations, limitations, how to extend it,
-  and how to present it.</p>
+  <p class="motto">{DS["motto"]}</p>
+  <p class="what">{DS["what"]}</p>
 </div>
-<div class="stats">
-  <div class="stat"><div class="k">tracked files</div><div class="v">{stats['files']}</div></div>
-  <div class="stat"><div class="k">lines of code</div><div class="v">{stats['lines']:,}</div></div>
-  <div class="stat"><div class="k">automated tests</div><div class="v">{stats['test_cases']}</div></div>
-  <div class="stat"><div class="k">defect classes</div><div class="v">2</div></div>
-</div>
-<div class="foot"><span>VANTA project · generated from the repository</span><span>{today}</span></div>
+<div class="stats">{stat_html}</div>
+<div class="foot"><span>VANTA project · {DS["footer"].split(" · ")[1]}</span><span>{today}</span></div>
 </div></body></html>"""
 
 
 def render(html_path: Path, pdf_path: Path, footer: bool) -> None:
-    subprocess.run(["node", str(RENDER), str(html_path), str(pdf_path), "1" if footer else "0"],
-                   check=True)
+    subprocess.run(["node", str(RENDER), str(html_path), str(pdf_path), "1" if footer else "0",
+                    DS["footer"]], check=True)
 
 
 def outline_pages(pdf_path: Path, toc: list[dict]) -> dict[str, int]:
@@ -238,7 +277,7 @@ def outline_pages(pdf_path: Path, toc: list[dict]) -> dict[str, int]:
     pages: dict[str, int] = {}
     cursor = 0
     for e in toc:
-        want = (f"Chapter {e['num']}" if e["level"] == 1 else e["num"])
+        want = e["label"]
         for j in range(cursor, len(flat)):
             t = flat[j][0].lower()
             if t.startswith(want.lower()) and e["title"][:20].lower() in t:
@@ -249,8 +288,13 @@ def outline_pages(pdf_path: Path, toc: list[dict]) -> dict[str, int]:
 
 
 def main() -> None:
-    BUILD.mkdir(exist_ok=True)
-    stats = repo_stats()
+    global DS
+    name = sys.argv[1] if len(sys.argv) > 1 else "technical"
+    DS = DOCSETS[name]
+    BUILD = DOCS / "build" / name
+    OUT = DS["out"]
+    BUILD.mkdir(parents=True, exist_ok=True)
+    stats = repo_stats() if DS["stats"] is None else {}
     (BUILD / "cover.html").write_text(build_cover(stats), encoding="utf-8")
     render(BUILD / "cover.html", BUILD / "cover.pdf", footer=False)
 
@@ -287,8 +331,7 @@ def main() -> None:
             last_ch = writer.add_outline_item(title, page_index)
         else:
             writer.add_outline_item(title, page_index, parent=last_ch)
-    writer.add_metadata({"/Title": "VANTA — Technical documentation",
-                         "/Subject": "Every concept, feature and file of the VANTA project",
+    writer.add_metadata({"/Title": DS["title"], "/Subject": DS["subject"],
                          "/Creator": "docs/build_docs.py"})
     with open(OUT, "wb") as f:
         writer.write(f)

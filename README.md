@@ -22,6 +22,10 @@ from running code.
   concept, every feature, every file, the HTTP API, the database, the C protocols, testing,
   operations, limitations, how to add a defect class, and a demo script. Rebuild it with
   `python3 docs/build_docs.py`.
+- **`docs/VANTA-Scope-and-Strategy.pdf`**: what VANTA's scope is, how students learn with it,
+  six competition formats (Sprint, Marathon, Arena, Hackathon, Incident Night, League) including
+  DSA and competitive programming, a roadmap, and an industry plan. Rebuild it with
+  `python3 docs/build_docs.py strategy`.
 - **In-app guide**: open `/guide` in the web UI (linked in the header) for a five-minute
   walkthrough aimed at new users.
 
