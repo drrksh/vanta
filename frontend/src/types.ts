@@ -16,8 +16,9 @@ export interface WorldFull extends WorldSummary {
   mandatory_properties: string[]
   optional_objectives: string[]
   sample_input_description: string
+  cohort?: { code: string; name: string; display_name: string } | null
 }
-export interface TestResult { test: string; passed: boolean }
+export interface TestResult { test: string; passed: boolean; hidden?: boolean }
 export interface SubmitResult {
   verdict: 'accepted' | 'rejected'
   reason?: string | null
@@ -96,4 +97,29 @@ export interface Profile {
   experiments_run: number; witness_questions: number
   history: { world_id: string; difficulty: number; verdict: string; passed: number; total: number
              rating_before: number; rating_after: number; at: string }[]
+}
+
+// --- Cohorts ---------------------------------------------------------------
+export interface Cohort {
+  code: string; name: string; archetype_id: string; archetype_title: string
+  target_difficulty: number; status: 'open' | 'closed'; member_count: number
+  host_id: string; created_at: string
+  membership?: { user_id: string; display_name: string; world_id: string; joined_at: string } | null
+}
+export interface CohortMember {
+  user_id: string; display_name: string; world_id: string; joined_at: string
+  world_exists: boolean; identifiers: string[]; submissions: number; solved: boolean
+  solved_at: string | null; best: { passed: number; total: number } | null
+  experiments: number; witness_questions: number
+}
+export interface Originality {
+  submissions_compared: number; unchanged_from_starter: string[]; accepted: number
+  distinct_approaches: number; approaches: string[][]
+  pairs: { a: string; b: string; similarity: number; both_accepted: boolean }[]
+  near_identical: { a: string; b: string; similarity: number; both_accepted: boolean }[]
+  method: string
+}
+export interface CohortHostView extends Cohort {
+  setting: string | null; defect_variant: string; defect_class: string
+  members: CohortMember[]; originality: Originality; solved_count: number
 }

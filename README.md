@@ -44,6 +44,51 @@ base, so there is nothing to coax out of them.
   stops the big job starving can make the frequent small user wait longer, and
   that witness will say so.
 
+## Cohorts: one problem for the whole room
+
+A host opens a cohort and gets a six-letter join code. VANTA fixes one defect class, one exact bug
+variant and one story setting for the cohort. Each member who joins gets a world evolved just for
+them: the same defect in the same setting, but their own struct and function names and their own
+constants. Joining checks that no two members share an identifier set, so code copied from a
+neighbour won't compile against your system.
+
+The host console (`/cohorts/CODE/host`) shows who joined, each member's identifiers, how far they
+got, and how much they investigated. It also reports **how many distinct approaches** the accepted
+solutions represent. Each submission is normalized against its own world, has the member's starter
+subtracted, and is fingerprinted, so renaming variables doesn't hide anything. Near-identical pairs
+are surfaced for the host to check. This measures approach diversity, not a plagiarism verdict.
+Hidden checks are reported to contestants as "hidden check 3", never by name.
+
+## Discord
+
+The bot is a thin client over the same API (`discord_bot/`); Discord and the web UI share one store.
+
+```bash
+pip install -r discord_bot/requirements.txt
+DISCORD_TOKEN=... VANTA_API_URL=http://127.0.0.1:8811 VANTA_WEB_URL=http://127.0.0.1:5173 \
+DISCORD_GUILD_ID=<your server id> python -m discord_bot.bot
+```
+
+| Command | What it does |
+|---|---|
+| `/vanta create [defect] [difficulty]` | Evolve a new world for you (calibrated by default); the starter arrives as a `.c` file |
+| `/vanta list` · `/vanta info world_id` | Your worlds; one world's briefing, requirements and starter |
+| `/vanta submit world_id file\|code` | Grade a fix; shows checks and your rating change |
+| `/vanta delete world_id` · `/vanta delete_all` | Tear down one or all of **your** worlds |
+| `/vanta admin_delete_all` | Server admins (Manage Server) only: tear down every world |
+| `/vanta witnesses` · `/vanta ask world_id witness question` | One question, one answer computed from a real run; no back-and-forth |
+| `/vanta probe world_id [scenario] [file]` | Run an experiment on the original system or your attached code |
+| `/vanta profile` | Rating, level and next calibrated difficulty |
+| `/vanta cohort_create name [defect] [difficulty]` | Host a cohort; posts the join code |
+| `/vanta join code` | Join and receive your own world privately |
+| `/vanta cohort_status\|cohort_close\|cohort_delete code` | Host only: progress and approaches; stop joins; delete the cohort and its worlds |
+
+World commands create and delete whole VANTA worlds; nothing creates or deletes Discord channels.
+
+**Admin rights.** Set `VANTA_ADMIN_TOKEN` on both the API and the bot. The bot sends it only for
+Discord users with Manage Server. Without the token configured (local demo), any request carrying an
+`X-Vanta-Admin` header is treated as admin. Requests without the header can only touch what the caller owns.
+
 ## Running it
 
 ```bash
@@ -58,7 +103,7 @@ npm install
 npm run dev -- --host 127.0.0.1 --port 5173      # proxies /api to :8811
 ```
 
-Open http://127.0.0.1:5173.
+Open http://127.0.0.1:5173. (`./run_dev.sh` starts both in the background once dependencies are installed.)
 
 Tests: `cd backend && .venv/bin/python3 -m pytest tests -q`. The evolution tests compile many worlds and take a few minutes.
 
@@ -74,6 +119,9 @@ Tests: `cd backend && .venv/bin/python3 -m pytest tests -q`. The evolution tests
 | GET | `/api/worlds/{id}/witnesses` | Who was there and what they can be asked |
 | POST | `/api/worlds/{id}/witnesses/{key}/ask` | `{topic \| question, c_source?}`: ask, optionally relive the period under your code |
 | GET | `/api/profiles/{user}` | Rating, level, recommended difficulty, history |
+| POST / GET | `/api/cohorts`, `/api/cohorts/{code}` | Open a cohort; public cohort info (+ your membership) |
+| POST | `/api/cohorts/{code}/join` | Join and receive your own world |
+| GET / POST / DELETE | `/api/cohorts/{code}/host`, `/close`, `/api/cohorts/{code}` | Host console data; stop joins; delete cohort and member worlds |
 | GET | `/api/admin/worlds/{id}` | Ground truth, genes and fitness (admin only) |
 
 ## A five-minute demo

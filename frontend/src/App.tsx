@@ -1,5 +1,7 @@
 import { Link, Route, Routes } from 'react-router-dom'
 import { ProfileBadge } from './components/ProfileBadge'
+import CohortHostPage from './pages/CohortHostPage'
+import CohortJoinPage from './pages/CohortJoinPage'
 import LandingPage from './pages/LandingPage'
 import WorldPage from './pages/WorldPage'
 
@@ -28,6 +30,8 @@ export default function App() {
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/worlds/:id" element={<WorldPage />} />
+          <Route path="/cohorts/:code" element={<CohortJoinPage />} />
+          <Route path="/cohorts/:code/host" element={<CohortHostPage />} />
         </Routes>
       </main>
     </div>

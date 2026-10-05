@@ -43,8 +43,8 @@ export default function WorldPage() {
     </div>
   )
 
-  // Map test results onto the requirements checklist (best-effort by index,
-  // since each requirement corresponds to the mandatory property set).
+  // Checks don't map one-to-one onto the requirements (a hidden check can
+  // exercise several properties), so they're reported separately.
   const tests = result?.tests ?? []
 
   return (
@@ -52,6 +52,9 @@ export default function WorldPage() {
       <div>
         <div className="mb-2 flex items-center gap-2">
           <Chip tone="structure">{world.world_id}</Chip>
+          {world.cohort && (
+            <Chip tone="signal">cohort {world.cohort.name} · {world.cohort.code}</Chip>
+          )}
           <span className="mono text-[11px]" style={{ color: 'var(--ink-faint)' }}>seed {world.seed}</span>
         </div>
         <h1 className="display text-[28px]" style={{ fontWeight: 600 }}>{world.title}</h1>
@@ -78,18 +81,12 @@ export default function WorldPage() {
         <div>
           <Label>Requirements — must all hold</Label>
           <ul className="space-y-2">
-            {world.mandatory_properties.map((p, i) => {
-              const t = tests[i]
-              const mark = !result ? '·' : t ? (t.passed ? '✓' : '✗') : '·'
-              const col = !result || !t ? 'var(--ink-faint)'
-                : t.passed ? 'var(--accepted)' : 'var(--rejected)'
-              return (
-                <li key={i} className="flex gap-2.5 text-[14px]">
-                  <span className="mono mt-0.5" style={{ color: col }}>{mark}</span>
-                  <span style={{ color: 'var(--ink-dim)' }}>{p}</span>
-                </li>
-              )
-            })}
+            {world.mandatory_properties.map((p, i) => (
+              <li key={i} className="flex gap-2.5 text-[14px]">
+                <span className="mono mt-0.5" style={{ color: 'var(--ink-faint)' }}>·</span>
+                <span style={{ color: 'var(--ink-dim)' }}>{p}</span>
+              </li>
+            ))}
           </ul>
         </div>
       </section>
@@ -153,6 +150,26 @@ export default function WorldPage() {
                 : 'Your fix does not satisfy every required property yet.'}
             </span>
           </div>
+          {tests.length > 0 && (
+            <div className="mt-4">
+              <div className="mono mb-2 text-[11px] uppercase" style={{ color: 'var(--ink-faint)', letterSpacing: '0.1em' }}>
+                checks · {tests.filter((t) => t.passed).length} of {tests.length} passed
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {tests.map((t, i) => (
+                  <Chip key={i} tone={t.passed ? 'accepted' : 'rejected'}>
+                    {t.passed ? '✓' : '✗'} {t.test}
+                  </Chip>
+                ))}
+              </div>
+              {result.verdict !== 'accepted' && tests.some((t) => t.hidden && !t.passed) && (
+                <p className="mt-2 text-[12.5px]" style={{ color: 'var(--ink-faint)' }}>
+                  Hidden checks are unnamed on purpose. Work out which requirement your code breaks
+                  by asking witnesses or running experiments.
+                </p>
+              )}
+            </div>
+          )}
           {result.rating && result.rating.counted && (
             <p className="mono mt-3 text-[12px]" style={{ color: 'var(--ink-dim)' }}>
               rating {Math.round(result.rating.before)} → {Math.round(result.rating.after)}{' '}

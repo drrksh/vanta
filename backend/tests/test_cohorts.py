@@ -148,3 +148,13 @@ async def test_cohort_api_and_world_ownership(tmp_db):
         assert (await c.delete(f"/api/cohorts/{code}", params={"host_id": "stu"})).status_code == 403
         assert (await c.delete(f"/api/cohorts/{code}", params={"host_id": "prof"})).status_code == 200
         assert (await c.get(f"/api/cohorts/{code}")).status_code == 404
+
+
+def test_starter_code_never_explains_its_own_bug():
+    from app.worldgen.registry import ARCHETYPES_BY_ID
+
+    for arch in ARCHETYPES_BY_ID.values():
+        for v in arch.variants:
+            src = arch.generate(5, pins={"variant": v}).starter_source
+            assert "/*" not in src and "//" not in src, (arch.id, v)
+            assert "(void)" not in src, (arch.id, v)

@@ -156,11 +156,10 @@ int {checkout_func}(struct {struct_name} pool[], int poolSize, int holderId) {{
     def _starter(self, struct_name, checkout_func, release_func, bug_variant) -> str:
         checkout_src = self._checkout_impl(struct_name, checkout_func, bug_variant)
         if bug_variant == "linear_search_first_match":
+            # Bug: matches the last-recorded holderId without checking the slot
+            # is still in use, so a second release "succeeds" on a free slot.
+            # (Explained here, never in the contestant-facing source.)
             release_src = f"""
-/* Frees whichever slot's last-recorded holderId matches, without checking
-   the slot is actually still in use. A slot released earlier still has its
-   old holderId in memory, so a second release with the same holderId can
-   "succeed" against an already-free slot. */
 int {release_func}(struct {struct_name} pool[], int poolSize, int holderId) {{
     for (int i = 0; i < poolSize; i++) {{
         if (pool[i].holderId == holderId) {{ pool[i].inUse = 0; return 1; }}
@@ -171,7 +170,7 @@ int {release_func}(struct {struct_name} pool[], int poolSize, int holderId) {{
         elif bug_variant == "off_by_one_index":
             release_src = f"""
 int {release_func}(struct {struct_name} pool[], int poolSize, int holderId) {{
-    int idx = holderId % (poolSize + 1);  /* off-by-one: should be % poolSize */
+    int idx = holderId % (poolSize + 1);
     if (idx >= 0 && idx < poolSize && pool[idx].inUse) {{ pool[idx].inUse = 0; return 1; }}
     return 0;
 }}

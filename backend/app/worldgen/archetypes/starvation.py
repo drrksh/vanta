@@ -194,7 +194,6 @@ int {func_name}(struct {struct_name} jobs[], int count, int now, int minutesLeft
         if bug_variant == "no_close_check":
             return f"""
 int {func_name}(struct {struct_name} jobs[], int count, int now, int minutesLeftToday) {{
-    (void)minutesLeftToday;
     int oldest = -1;
     for (int i = 0; i < count; i++) {{
         if (jobs[i].isAbandoned || jobs[i].isFinished || jobs[i].isRejected) continue;

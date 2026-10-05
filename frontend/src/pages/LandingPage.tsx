@@ -4,7 +4,7 @@ import { api } from '../api/client'
 import { useProfile } from '../components/ProfileBadge'
 import { Button, Chip, Label, Panel, Spinner } from '../components/ui'
 import { userId } from '../lib/user'
-import type { Archetype, WorldSummary } from '../types'
+import type { Archetype, Cohort, WorldSummary } from '../types'
 
 const DIFFS = [
   { v: 0.2, label: 'Gentle' },
@@ -24,9 +24,17 @@ export default function LandingPage() {
   const [worlds, setWorlds] = useState<WorldSummary[]>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [hosted, setHosted] = useState<Cohort[]>([])
+  const [joinCode, setJoinCode] = useState('')
+  const [cohortName, setCohortName] = useState('')
+  const [cohortArch, setCohortArch] = useState('')
+  const [cohortDiff, setCohortDiff] = useState(0.45)
+  const [cohortBusy, setCohortBusy] = useState(false)
+  const [cohortErr, setCohortErr] = useState<string | null>(null)
 
   useEffect(() => {
     api.archetypes().then(setArchetypes).catch(() => {})
+    api.hostedCohorts(uid).then(setHosted).catch(() => {})
     refresh()
   }, [])
   function refresh() { api.list(uid).then(setWorlds).catch(() => {}) }
@@ -40,7 +48,14 @@ export default function LandingPage() {
       setError(e instanceof Error ? e.message : String(e)); setBusy(false)
     }
   }
-  async function del(id: string) { await api.remove(id); refresh() }
+  async function del(id: string) { await api.remove(id, uid); refresh() }
+  async function hostCohort() {
+    setCohortBusy(true); setCohortErr(null)
+    try {
+      const c = await api.createCohort(uid, cohortName, cohortArch || undefined, cohortDiff)
+      nav(`/cohorts/${c.code}/host`)
+    } catch (e) { setCohortErr(e instanceof Error ? e.message : String(e)); setCohortBusy(false) }
+  }
 
   return (
     <div className="space-y-12">
@@ -106,6 +121,69 @@ export default function LandingPage() {
         {error && <p className="mt-3 text-[13px]" style={{ color: 'var(--rejected)' }}>{error}</p>}
       </Panel>
 
+      <section>
+        <div className="mb-3 flex items-center gap-2">
+          <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--structure)' }} />
+          <span className="mono text-[11px] uppercase" style={{ color: 'var(--structure)', letterSpacing: '0.14em' }}>
+            cohorts · one problem, a world per person
+          </span>
+        </div>
+        <div className="grid gap-4 md:grid-cols-[1fr_1.4fr]">
+          <Panel className="p-6">
+            <Label>Join a cohort</Label>
+            <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); if (joinCode.trim()) nav(`/cohorts/${joinCode.trim().toUpperCase()}`) }}>
+              <input value={joinCode} onChange={(e) => setJoinCode(e.target.value.toUpperCase())} maxLength={6}
+                placeholder="CODE" aria-label="Join code"
+                className="vanta-focus mono w-full rounded-md border px-3 py-2 text-[18px] tracking-[0.2em]"
+                style={{ borderColor: 'var(--line-bright)', background: 'var(--panel-2)', color: 'var(--ink)' }} />
+              <Button type="submit" disabled={joinCode.trim().length < 6}>Join</Button>
+            </form>
+            <p className="mt-3 text-[13px]" style={{ color: 'var(--ink-faint)' }}>
+              Everyone in a cohort faces the same defect, but each system is evolved separately with
+              its own names and numbers.
+            </p>
+          </Panel>
+          <Panel className="p-6">
+            <Label>Host a cohort</Label>
+            <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); if (cohortName.trim()) hostCohort() }}>
+              <input value={cohortName} onChange={(e) => setCohortName(e.target.value)} maxLength={80}
+                placeholder="e.g. CS1 lab, week 6" aria-label="Cohort name"
+                className="vanta-focus w-full rounded-md border px-3 py-2 text-[14px]"
+                style={{ borderColor: 'var(--line-bright)', background: 'var(--panel-2)', color: 'var(--ink)' }} />
+              <div className="flex flex-wrap gap-2">
+                <ArchChip active={cohortArch === ''} onClick={() => setCohortArch('')} label="Surprise everyone" />
+                {archetypes.map((a) => (
+                  <ArchChip key={a.id} active={cohortArch === a.id} onClick={() => setCohortArch(a.id)} label={a.title} />
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {DIFFS.map((d) => (
+                  <ArchChip key={d.v} active={Math.abs(cohortDiff - d.v) < 0.01} onClick={() => setCohortDiff(d.v)} label={d.label} />
+                ))}
+              </div>
+              <div className="flex items-center gap-3">
+                <Button type="submit" disabled={cohortBusy || !cohortName.trim()}>
+                  {cohortBusy ? <><Spinner /> opening…</> : 'Open cohort'}
+                </Button>
+                {cohortErr && <span className="text-[13px]" style={{ color: 'var(--rejected)' }}>{cohortErr}</span>}
+              </div>
+            </form>
+          </Panel>
+        </div>
+        {hosted.length > 0 && (
+          <div className="mt-4 flex flex-wrap gap-2">
+            <span className="mono self-center text-[11px]" style={{ color: 'var(--ink-faint)' }}>You host:</span>
+            {hosted.map((c) => (
+              <button key={c.code} onClick={() => nav(`/cohorts/${c.code}/host`)}
+                className="vanta-focus rounded-md border px-3 py-1.5 text-left text-[13px]"
+                style={{ borderColor: 'var(--line-bright)', color: 'var(--ink-dim)' }}>
+                <span className="mono" style={{ color: 'var(--structure)' }}>{c.code}</span> · {c.name} · {c.member_count} joined
+              </button>
+            ))}
+          </div>
+        )}
+      </section>
+
       {worlds.length > 0 && (
         <section>
           <Label>Your open worlds</Label>
@@ -136,7 +214,7 @@ export default function LandingPage() {
 
 function ArchChip({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) {
   return (
-    <button onClick={onClick}
+    <button type="button" onClick={onClick}
       className="vanta-focus rounded-md border px-3 py-1.5 text-[13px] transition-all"
       style={{
         borderColor: active ? 'var(--structure)' : 'var(--line-bright)',
