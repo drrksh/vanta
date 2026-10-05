@@ -71,7 +71,7 @@ th { text-align: left; background: #1d2433; color: #fff; font-weight: 600; paddi
 td { padding: 3.5pt 6pt; border: 0.6pt solid #d4d9e1; vertical-align: top; }
 tbody tr:nth-child(even) td { background: #f7f9fb; }
 td code, th code { font-size: 0.9em; white-space: normal; word-break: break-word; }
-td:first-child { min-width: 27mm; }
+td:first-child { min-width: 31mm; }
 figure.diagram { margin: 10pt 0 14pt; break-inside: avoid; text-align: center; }
 figure.diagram svg { width: 100%; height: auto; max-height: 205mm; }
 figcaption { font-size: 8.3pt; color: #5b6475; margin-top: 4pt; font-style: italic; }
