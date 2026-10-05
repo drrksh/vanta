@@ -336,11 +336,10 @@ async def delete_cohort(code: str, host_id: str | None = None,
 # --- Admin: exposes ground truth + fitness, never reachable in contestant UI ---
 
 @router.get("/admin/worlds/{world_id}")
-async def admin_get_world(world_id: str):
-    try:
-        r = _manager.get_world(world_id)
-    except WorldNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+async def admin_get_world(world_id: str, x_vanta_admin: str | None = Header(default=None)):
+    if not _is_admin(x_vanta_admin):
+        raise HTTPException(status_code=403, detail="Admin only")
+    r = _record(world_id)
     return {
         **_public(r),
         "ground_truth_summary": r.world.ground_truth_summary,

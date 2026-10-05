@@ -141,6 +141,9 @@ async def test_cohort_api_and_world_ownership(tmp_db):
         # Ownership: nobody deletes someone else's world without admin rights.
         assert (await c.delete(f"/api/worlds/{wid}", params={"requested_by": "intruder"})).status_code == 403
         assert (await c.delete("/api/worlds")).status_code == 403
+        assert (await c.get(f"/api/admin/worlds/{wid}")).status_code == 403
+        adm = (await c.get(f"/api/admin/worlds/{wid}", headers={"X-Vanta-Admin": "x"})).json()
+        assert "ground_truth_summary" in adm
         assert (await c.delete("/api/worlds", headers={"X-Vanta-Admin": "x"})).status_code == 200
 
         bad = await c.post("/api/cohorts/NOPE99/join", json={"user_id": "a", "display_name": "a"})
