@@ -114,6 +114,11 @@ int {release_func}(struct {struct_name} pool[], int poolSize, int holderId);
                 f"archetype={self.id} bug_variant={bug_variant} pool_size={pool_size} "
                 f"cycle_count={cycle_count} checkout={checkout_func} release={release_func} mag={mag:.2f}"
             ),
+            params={
+                "struct_name": struct_name, "checkout_func": checkout_func,
+                "release_func": release_func, "bug_variant": bug_variant,
+                "pool_size": pool_size, "cycle_count": cycle_count, "domain": domain,
+            },
         )
 
     def _checkout_impl(self, struct_name, checkout_func, bug_variant) -> str:

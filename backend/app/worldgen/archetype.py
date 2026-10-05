@@ -54,6 +54,10 @@ class GeneratedWorld:
     agent_groundings: list[GeneratedAgentGrounding]
     harness_source: str
     ground_truth_summary: str  # admin/debug only; never shown to a contestant
+    # Structured generation parameters (names, constants) that the
+    # investigation layer needs to build probe harnesses and witness runs.
+    # Admin/internal only -- never sent to a contestant verbatim.
+    params: dict = field(default_factory=dict)
 
 
 # Canonical difficulty genes. Every archetype reads what it understands and

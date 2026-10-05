@@ -157,6 +157,13 @@ int {func_name}(struct {struct_name} jobs[], int count, int now, int minutesLeft
                 f"small_job_minutes={small_job_minutes} small_interval={small_interval} "
                 f"starve_bound={starve_bound} subtlety={subtlety:.2f} mag={mag:.2f}"
             ),
+            params={
+                "struct_name": struct_name, "func_name": func_name, "bug_variant": bug_variant,
+                "day_length": day_length, "starve_bound": starve_bound,
+                "big_job_minutes": big_job_minutes, "big_submitted_at": big_submitted_at,
+                "small_job_minutes": small_job_minutes, "small_interval": small_interval,
+                "domain": domain,
+            },
         )
 
     def _starter(self, struct_name, func_name, bug_variant) -> str:

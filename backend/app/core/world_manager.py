@@ -51,12 +51,16 @@ _WORLD_FIELDS = (
 
 
 def _serialize_world(world: GeneratedWorld) -> str:
-    return json.dumps({f: getattr(world, f) for f in _WORLD_FIELDS})
+    d = {f: getattr(world, f) for f in _WORLD_FIELDS}
+    d["params"] = world.params
+    return json.dumps(d)
 
 
 def _deserialize_world(raw: str) -> GeneratedWorld:
     d = json.loads(raw)
-    return GeneratedWorld(agent_groundings=[], **{f: d[f] for f in _WORLD_FIELDS})
+    return GeneratedWorld(
+        agent_groundings=[], params=d.get("params") or {}, **{f: d[f] for f in _WORLD_FIELDS}
+    )
 
 
 @dataclass
