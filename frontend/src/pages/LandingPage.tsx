@@ -1,14 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
+import { useProfile } from '../components/ProfileBadge'
 import { Button, Chip, Label, Panel, Spinner } from '../components/ui'
+import { userId } from '../lib/user'
 import type { Archetype, WorldSummary } from '../types'
-
-function userId(): string {
-  let id = localStorage.getItem('vanta_uid')
-  if (!id) { id = Math.random().toString(36).slice(2, 10); localStorage.setItem('vanta_uid', id) }
-  return id
-}
 
 const DIFFS = [
   { v: 0.2, label: 'Gentle' },
@@ -22,7 +18,9 @@ export default function LandingPage() {
   const uid = userId()
   const [archetypes, setArchetypes] = useState<Archetype[]>([])
   const [archetype, setArchetype] = useState<string>('')
-  const [difficulty, setDifficulty] = useState(0.45)
+  // null = calibrated to this person's rating (the default)
+  const [difficulty, setDifficulty] = useState<number | null>(null)
+  const profile = useProfile()
   const [worlds, setWorlds] = useState<WorldSummary[]>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -60,7 +58,8 @@ export default function LandingPage() {
           Press generate and VANTA writes a small working system from scratch — its own names, its own
           numbers, and one real defect drawn at random. It then compiles and runs it to prove the defect
           is genuine and that more than one different fix can resolve it. No two generations are the same,
-          and nothing is stored in advance. Read the code, find what's wrong, and submit a fix that holds.
+          and nothing is stored in advance. Question people who lived through a real run of it, design
+          your own experiments, then submit a fix that holds.
         </p>
       </section>
 
@@ -79,11 +78,19 @@ export default function LandingPage() {
           <div>
             <Label>Difficulty</Label>
             <div className="flex flex-wrap gap-2">
+              <ArchChip active={difficulty === null} onClick={() => setDifficulty(null)}
+                label={profile ? `Calibrated to you · ${profile.recommended_difficulty.toFixed(2)}` : 'Calibrated to you'} />
               {DIFFS.map((d) => (
-                <ArchChip key={d.v} active={Math.abs(difficulty - d.v) < 0.01}
+                <ArchChip key={d.v} active={difficulty !== null && Math.abs(difficulty - d.v) < 0.01}
                   onClick={() => setDifficulty(d.v)} label={d.label} />
               ))}
             </div>
+            {difficulty === null && profile && (
+              <p className="mono mt-2 text-[11px]" style={{ color: 'var(--ink-faint)' }}>
+                {profile.level} · rating {Math.round(profile.rating)} · {profile.worlds_solved} solved.
+                Each fix you land pitches the next world a little harder.
+              </p>
+            )}
           </div>
         </div>
         <div className="mt-6 flex items-center gap-4">

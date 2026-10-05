@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { api } from '../api/client'
+import { ProbeLab } from '../components/ProbeLab'
 import { Button, Chip, Label, Panel, Spinner } from '../components/ui'
-import type { SubmitResult, WorldFull } from '../types'
+import { Witnesses } from '../components/Witnesses'
+import { notifyProfileChanged, userId } from '../lib/user'
+import type { SubmitResultWithRating, WorldFull } from '../types'
 
 export default function WorldPage() {
   const { id } = useParams<{ id: string }>()
@@ -10,8 +13,9 @@ export default function WorldPage() {
   const [world, setWorld] = useState<WorldFull | null>(null)
   const [code, setCode] = useState('')
   const [submitting, setSubmitting] = useState(false)
-  const [result, setResult] = useState<SubmitResult | null>(null)
+  const [result, setResult] = useState<SubmitResultWithRating | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [tab, setTab] = useState<'witnesses' | 'probe'>('witnesses')
 
   useEffect(() => {
     if (!id) return
@@ -22,7 +26,7 @@ export default function WorldPage() {
   async function submit() {
     if (!id) return
     setSubmitting(true); setResult(null)
-    try { setResult(await api.submit(id, code)) }
+    try { setResult(await api.submit(id, code, userId())); notifyProfileChanged() }
     catch (e) { setError(e instanceof Error ? e.message : String(e)) }
     finally { setSubmitting(false) }
   }
@@ -91,7 +95,36 @@ export default function WorldPage() {
       </section>
 
       <section>
-        <Label>Source — this is the current, broken behavior</Label>
+        <div className="mb-3 flex items-end justify-between gap-4">
+          <div>
+            <Label>Investigate</Label>
+            <p className="max-w-[64ch] text-[14px]" style={{ color: 'var(--ink-dim)' }}>
+              Nobody here knows the answer, and nothing is scripted. Talk to people who lived through a
+              real run of this system, or design your own experiment and run it.
+            </p>
+          </div>
+          <div className="inline-flex shrink-0 rounded-md border p-0.5" style={{ borderColor: 'var(--line-bright)' }}>
+            {([['witnesses', 'Witnesses'], ['probe', 'Probe lab']] as const).map(([k, label]) => (
+              <button key={k} onClick={() => setTab(k)}
+                className="vanta-focus rounded px-3.5 py-1.5 text-[13px]"
+                style={{ background: tab === k ? 'var(--panel-2)' : 'transparent',
+                         color: tab === k ? 'var(--structure)' : 'var(--ink-dim)' }}>
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className={tab === 'witnesses' ? '' : 'hidden'}>
+          <Witnesses worldId={world.world_id} code={code} starter={world.starter_source} />
+        </div>
+        <div className={tab === 'probe' ? '' : 'hidden'}>
+          <ProbeLab worldId={world.world_id} code={code} starter={world.starter_source} />
+        </div>
+      </section>
+
+      <section>
+        <Label>{code.trim() === world.starter_source.trim()
+          ? 'Source — this is the current, broken behavior' : 'Source — your edited version'}</Label>
         <textarea
           value={code} onChange={(e) => setCode(e.target.value)} rows={18} spellCheck={false}
           className="vanta-focus mono w-full resize-y rounded-lg border p-4 text-[13px] leading-relaxed"
@@ -120,6 +153,16 @@ export default function WorldPage() {
                 : 'Your fix does not satisfy every required property yet.'}
             </span>
           </div>
+          {result.rating && result.rating.counted && (
+            <p className="mono mt-3 text-[12px]" style={{ color: 'var(--ink-dim)' }}>
+              rating {Math.round(result.rating.before)} → {Math.round(result.rating.after)}{' '}
+              <span style={{ color: result.rating.after >= result.rating.before ? 'var(--accepted)' : 'var(--rejected)' }}>
+                ({result.rating.after >= result.rating.before ? '+' : ''}
+                {Math.round(result.rating.after - result.rating.before)})
+              </span>
+              {result.verdict === 'accepted' && ' · your next generated world will be pitched higher'}
+            </p>
+          )}
           {result.detail && (
             <pre className="mono mt-3 overflow-x-auto rounded p-3 text-[12px]"
               style={{ background: 'var(--field)', color: 'var(--rejected)' }}>

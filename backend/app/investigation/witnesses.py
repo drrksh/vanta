@@ -80,7 +80,7 @@ class Cast:
 
 class _TraceCache:
     """Memoized executions. Caching the *result of running code* is not a
-    fact store -- it's just not compiling the same thing twice."""
+    fact store — it's just not compiling the same thing twice."""
 
     def __init__(self, size: int = 96):
         self.size = size
@@ -174,7 +174,7 @@ class WitnessKit:
         original = await self.lived_period(world, cast, world.starter_source, sandbox, cache_key)
         if not original.ok:
             return {"witness": w.key, "topic": topic, "error": original.error,
-                    "text": "Something went badly wrong with the system that week -- it crashed.",
+                    "text": "Something went badly wrong with the system that week — it crashed.",
                     "detail": original.detail}
         base = self.answer(world, cast, w, topic, original.trace)
         result = {
@@ -197,7 +197,7 @@ class WitnessKit:
         return result
 
     def deflection(self, world, w: WitnessSpec) -> str:
-        return (f"I couldn't tell you how it works inside -- I'm not the one who wrote it. "
+        return (f"I couldn't tell you how it works inside — I'm not the one who wrote it. "
                 f"I can tell you what happened to me, and you can work out why.")
 
     def public(self, world: GeneratedWorld) -> list[dict]:
@@ -350,7 +350,7 @@ class StarvationWitnessKit(WitnessKit):
                 j = never[0]
                 parts.append(
                     f"{'One' if len(never) == 1 else len(never)} never started at all"
-                    + (f" -- the one I handed in at {clock(j['submitted_at'])} was still sitting "
+                    + (f" — the one I handed in at {clock(j['submitted_at'])} was still sitting "
                        f"there when the records end." if len(never) == 1 else ".")
                 )
             if rejected:
@@ -385,7 +385,7 @@ class StarvationWitnessKit(WitnessKit):
                 j = started[0]
                 txt = (f"My {noun} started at {clock(j['started_at'])}"
                        + (", the same day I handed it in. " if same_day else
-                          f" -- I'd handed it in on day {j['submitted_at'] // L + 1}. "))
+                          f" — I'd handed it in on day {j['submitted_at'] // L + 1}. "))
             else:
                 n = len(started)
                 if same_day == n:
@@ -490,7 +490,7 @@ class StarvationWitnessKit(WitnessKit):
                 parts.append(
                     f"Yes. On {_plural(len({e['t'] // L for e in late}), 'day')}, the scheduler kept "
                     f"choosing a {noun} that couldn't finish before closing. The {machine} won't start "
-                    f"those, so it just sat there -- {st['too_late_attempts']} minutes lost that way.")
+                    f"those, so it just sat there — {st['too_late_attempts']} minutes lost that way.")
             if bad:
                 parts.append(f"It also picked something it shouldn't have "
                              f"{_plural(st['invalid_picks'], 'time')}.")

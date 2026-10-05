@@ -1,4 +1,5 @@
 import { Link, Route, Routes } from 'react-router-dom'
+import { ProfileBadge } from './components/ProfileBadge'
 import LandingPage from './pages/LandingPage'
 import WorldPage from './pages/WorldPage'
 
@@ -15,9 +16,12 @@ export default function App() {
               generated broken · fixed by you
             </span>
           </Link>
-          <span className="mono text-[11px]" style={{ color: 'var(--ink-faint)' }}>
-            Virtualized Adversarial Network &amp; Technical Assessment
-          </span>
+          <div className="flex items-center gap-4">
+            <span className="mono hidden text-[11px] md:inline" style={{ color: 'var(--ink-faint)' }}>
+              Virtualized Adversarial Network &amp; Technical Assessment
+            </span>
+            <ProfileBadge />
+          </div>
         </div>
       </header>
       <main className="mx-auto max-w-5xl px-6 py-10">
