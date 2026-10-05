@@ -157,9 +157,24 @@ async def submit(world_id: str, body: SubmitRequest):
         "verdict": result["verdict"],
         "reason": result.get("reason"),
         "detail": result.get("detail") if result.get("reason") in ("compile_error", "timeout") else None,
-        "tests": [{"test": t["test"], "passed": t["passed"]} for t in tests],
+        "tests": _contestant_tests(tests),
         "rating": {"before": change.before, "after": change.after, "counted": change.counted},
     }
+
+
+def _contestant_tests(tests: list[dict]) -> list[dict]:
+    """Public checks keep their names. Hidden checks are numbered, never
+    named: a name like 'hidden_starvation_stream' would hand over the
+    scenario the contestant is meant to discover."""
+    out, n = [], 0
+    for t in tests:
+        if t["test"].startswith("public_"):
+            label = t["test"].removeprefix("public_").replace("_", " ")
+            out.append({"test": f"public: {label}", "passed": t["passed"], "hidden": False})
+        else:
+            n += 1
+            out.append({"test": f"hidden check {n}", "passed": t["passed"], "hidden": True})
+    return out
 
 
 # --- Investigation: probe lab + execution-grounded witnesses ---------------
