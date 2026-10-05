@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 import { useProfile } from '../components/ProfileBadge'
 import { Button, Chip, Label, Panel, Spinner } from '../components/ui'
@@ -76,6 +76,10 @@ export default function LandingPage() {
           and nothing is stored in advance. Question people who lived through a real run of it, design
           your own experiments, then submit a fix that holds.
         </p>
+        <Link to="/guide" className="mono mt-4 inline-block text-[12px] underline-offset-2 hover:underline"
+          style={{ color: 'var(--structure)' }}>
+          New here? Read the 5-minute guide →
+        </Link>
       </section>
 
       <Panel className="p-6">

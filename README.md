@@ -16,6 +16,15 @@ No problem, answer or character backstory is stored anywhere. Everything a
 contestant reads, every witness statement and every experiment result comes
 from running code.
 
+## Documentation
+
+- **`docs/VANTA-Technical-Documentation.pdf`**: the full technical reference. It covers every
+  concept, every feature, every file, the HTTP API, the database, the C protocols, testing,
+  operations, limitations, how to add a defect class, and a demo script. Rebuild it with
+  `python3 docs/build_docs.py`.
+- **In-app guide**: open `/guide` in the web UI (linked in the header) for a five-minute
+  walkthrough aimed at new users.
+
 ## The four layers
 
 | Layer | What it does | Where |

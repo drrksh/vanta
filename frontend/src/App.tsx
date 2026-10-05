@@ -2,6 +2,7 @@ import { Link, Route, Routes } from 'react-router-dom'
 import { ProfileBadge } from './components/ProfileBadge'
 import CohortHostPage from './pages/CohortHostPage'
 import CohortJoinPage from './pages/CohortJoinPage'
+import GuidePage from './pages/GuidePage'
 import LandingPage from './pages/LandingPage'
 import WorldPage from './pages/WorldPage'
 
@@ -19,9 +20,12 @@ export default function App() {
             </span>
           </Link>
           <div className="flex items-center gap-4">
-            <span className="mono hidden text-[11px] md:inline" style={{ color: 'var(--ink-faint)' }}>
+            <span className="mono hidden text-[11px] lg:inline" style={{ color: 'var(--ink-faint)' }}>
               Virtualized Adversarial Network &amp; Technical Assessment
             </span>
+            <Link to="/guide" className="vanta-focus rounded px-2 py-0.5 text-[13px]" style={{ color: 'var(--structure)' }}>
+              Guide
+            </Link>
             <ProfileBadge />
           </div>
         </div>
@@ -29,6 +33,7 @@ export default function App() {
       <main className="mx-auto max-w-5xl px-6 py-10">
         <Routes>
           <Route path="/" element={<LandingPage />} />
+          <Route path="/guide" element={<GuidePage />} />
           <Route path="/worlds/:id" element={<WorldPage />} />
           <Route path="/cohorts/:code" element={<CohortJoinPage />} />
           <Route path="/cohorts/:code/host" element={<CohortHostPage />} />
